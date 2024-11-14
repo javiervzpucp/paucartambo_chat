@@ -76,7 +76,6 @@ st.write(resp['answer'])
 def upload_to_vectara(file_path):
     url = "https://api.vectara.io/v2/corpora/2/upload_file"  # Reemplaza ':corpus_key' con tu clave de corpus específica
     headers = {
-        "Content-Type": "multipart/form-data",
         "Accept": "application/json",
         "x-api-key": "zqt_nDJrRzuEwpSstPngTiTio43sQzykyJ1x6PebAQ"  # Reemplaza <API_KEY_VALUE> con tu API Key de Vectara
     }

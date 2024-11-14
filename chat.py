@@ -72,17 +72,13 @@ resp = rag.invoke(query_str)
 st.write("**Respuesta**")
 st.write(resp['answer'])
 
-# Indicador de satisfacción
-st.write("**¿Estás satisfecho con esta respuesta?**")
-col1, col2 = st.columns(2)
-
 # Función para cargar el archivo a Vectara
 def upload_to_vectara(file_path):
-    url = "https://api.vectara.io/v1/documents"
+    url = "https://api.vectara.io/v2/corpora/2/upload_file"  # Reemplaza ':corpus_key' con tu clave de corpus específica
     headers = {
-        "Authorization": "Bearer zqt_nDJrRzuEwpSstPngTiTio43sQzykyJ1x6PebAQ",
-        "customer-id": "2620549959",
-        "corpus-id": "2",
+        "Content-Type": "multipart/form-data",
+        "Accept": "application/json",
+        "x-api-key": "zqt_nDJrRzuEwpSstPngTiTio43sQzykyJ1x6PebAQ"  # Reemplaza <API_KEY_VALUE> con tu API Key de Vectara
     }
     files = {
         "file": open(file_path, "rb")
@@ -92,6 +88,14 @@ def upload_to_vectara(file_path):
         st.success("¡La respuesta satisfactoria se ha cargado exitosamente al corpus de Vectara!")
     else:
         st.error("Error al cargar la respuesta a Vectara. Código de estado: " + str(response.status_code))
+        st.error("Mensaje de error: " + response.text)
+
+# Indicador de satisfacción
+st.write("**¿Estás satisfecho con esta respuesta?**")
+col1, col2 = st.columns(2)
+
+# Ruta del archivo CSV para guardar respuestas satisfactorias
+file_path = "satisfactory_responses.csv"
 
 with col1:
     if st.button("😊 Sí, estoy feliz con la respuesta"):
@@ -102,7 +106,6 @@ with col1:
             "response": [resp['answer']],
         }
         satisfactory_feedback_df = pd.DataFrame(satisfactory_feedback_data)
-        file_path = "satisfactory_responses.csv"
         satisfactory_feedback_df.to_csv(file_path, mode='a', header=False, index=False)
         
         # Subir archivo a Vectara

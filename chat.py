@@ -80,7 +80,7 @@ col1, col2 = st.columns(2)
 def upload_to_vectara(file_path):
     url = "https://api.vectara.io/v1/upload-file"
     headers = {
-        "Authorization": "zqt_nDJrRzuEwpSstPngTiTio43sQzykyJ1x6PebAQ",
+        "Authorization": "Bearer zqt_nDJrRzuEwpSstPngTiTio43sQzykyJ1x6PebAQ",
         "customer-id": "2620549959",
         "corpus-id": "2",
     }

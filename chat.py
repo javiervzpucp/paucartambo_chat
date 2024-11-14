@@ -6,12 +6,15 @@ Created on Thu Nov 14 11:08:21 2024
 """
 
 import streamlit as st
+import pandas as pd
+import requests
 from langchain_community.vectorstores import Vectara
 from langchain_community.vectorstores.vectara import (
     RerankConfig,
     SummaryConfig,
     VectaraQueryConfig,
 )
+from datetime import datetime
 
 # Configuración de Vectara
 vectara = Vectara(
@@ -30,8 +33,8 @@ config = VectaraQueryConfig(
 # Título grande
 st.markdown("<h1 style='font-size: 36px;'>Prototipo de chat sobre las Devociones Marianas de Paucartambo</h1>", unsafe_allow_html=True)
 
-# Mostrar imagen debajo del título
-st.image("https://raw.githubusercontent.com/javiervzpucp/paucartambo/main/imagenes/1.png", caption="Virgen del Carmen de Paucartambo", use_container_width=True)
+# Mostrar imagen debajo del título con use_container_width
+st.image("/mnt/data/1.png", caption="Virgen del Carmen de Paucartambo", use_container_width=True)
 
 # Lista de preguntas sugeridas
 preguntas_sugeridas = [
@@ -68,3 +71,46 @@ resp = rag.invoke(query_str)
 # Mostrar la respuesta
 st.write("**Respuesta**")
 st.write(resp['answer'])
+
+# Indicador de satisfacción
+st.write("**¿Estás satisfecho con esta respuesta?**")
+col1, col2 = st.columns(2)
+
+# Función para cargar el archivo a Vectara
+def upload_to_vectara(file_path):
+    url = "https://api.vectara.io/v1/upload-file"
+    headers = {
+        "Authorization": "zqt_nDJrRzuEwpSstPngTiTio43sQzykyJ1x6PebAQ",
+        "customer-id": "2620549959",
+        "corpus-id": "2",
+    }
+    files = {
+        "file": open(file_path, "rb")
+    }
+    response = requests.post(url, headers=headers, files=files)
+    if response.status_code == 200:
+        st.success("¡La respuesta satisfactoria se ha cargado exitosamente al corpus de Vectara!")
+    else:
+        st.error("Error al cargar la respuesta a Vectara. Código de estado: " + str(response.status_code))
+
+with col1:
+    if st.button("😊 Sí, estoy feliz con la respuesta"):
+        # Guardar feedback positivo en un archivo CSV para agregar al corpus de Vectara posteriormente
+        satisfactory_feedback_data = {
+            "timestamp": [datetime.now()],
+            "query": [query_str],
+            "response": [resp['answer']],
+        }
+        satisfactory_feedback_df = pd.DataFrame(satisfactory_feedback_data)
+        file_path = "satisfactory_responses.csv"
+        satisfactory_feedback_df.to_csv(file_path, mode='a', header=False, index=False)
+        
+        # Subir archivo a Vectara
+        upload_to_vectara(file_path)
+        
+        # Mostrar mensaje de confirmación
+        st.success("Gracias por tu retroalimentación. ¡Esto ayudará a mejorar futuras respuestas!")
+
+with col2:
+    if st.button("😞 No, no estoy feliz con la respuesta"):
+        st.info("Gracias por tu retroalimentación. Trabajaremos para mejorar.")

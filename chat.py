@@ -34,7 +34,7 @@ config = VectaraQueryConfig(
 st.markdown("<h1 style='font-size: 36px;'>Prototipo de chat sobre las Devociones Marianas de Paucartambo</h1>", unsafe_allow_html=True)
 
 # Mostrar imagen debajo del título con use_container_width
-st.image("/mnt/data/1.png", caption="Virgen del Carmen de Paucartambo", use_container_width=True)
+st.image("https://raw.githubusercontent.com/javiervzpucp/paucartambo/main/imagenes/1.png", caption="Virgen del Carmen de Paucartambo", use_container_width=True)
 
 # Lista de preguntas sugeridas
 preguntas_sugeridas = [

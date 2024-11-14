@@ -78,7 +78,7 @@ col1, col2 = st.columns(2)
 
 # Función para cargar el archivo a Vectara
 def upload_to_vectara(file_path):
-    url = "https://api.vectara.io/v1/upload-file"
+    url = "https://api.vectara.io/v1/documents"
     headers = {
         "Authorization": "Bearer zqt_nDJrRzuEwpSstPngTiTio43sQzykyJ1x6PebAQ",
         "customer-id": "2620549959",

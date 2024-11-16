@@ -77,16 +77,22 @@ query_str = st.text_input(
     value=st.session_state.query,
 )
 
-# Process query and get response
-if query_str and query_str != st.session_state.query:
-    st.session_state.query = query_str
-    rag = vectara.as_chat(config)
-    response = rag.invoke(query_str)
-    st.session_state.response = response.get("answer", "Lo siento, no tengo suficiente información para responder a tu pregunta.")
+# "Responder" button to fetch response
+if st.button("Responder"):
+    if query_str.strip():
+        st.session_state.query = query_str
+        rag = vectara.as_chat(config)
+        response = rag.invoke(query_str)
+        st.session_state.response = response.get("answer", "Lo siento, no tengo suficiente información para responder a tu pregunta.")
+    else:
+        st.warning("Por favor, ingresa una pregunta válida.")
 
 # Display response
 st.write("**Respuesta:**")
-st.write(st.session_state.response)
+if st.session_state.response:
+    st.write(st.session_state.response)
+else:
+    st.info("No se ha generado una respuesta aún. Presiona 'Responder' para continuar.")
 
 # Thumbs-up and Thumbs-down buttons for feedback
 st.write("**¿Esta respuesta fue satisfactoria?**")

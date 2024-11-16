@@ -20,7 +20,7 @@ from datetime import datetime
 vectara = Vectara(
                 vectara_customer_id="2620549959",
                 vectara_corpus_id=2,
-                vectara_api_key="zqt_nDJrRzuEwpSstPngTiTio43sQzykyJ1x6PebAQ"
+                vectara_api_key="zwt_nDJrRzeXqkymaH-tptpheMyOCzm4oL_NKD9hOw"
             )
 
 # Configuraciones adicionales de Vectara
@@ -74,7 +74,20 @@ st.write(resp['answer'])
 
 # Función para cargar el archivo a Vectara
 def upload_to_vectara(file_path):
-   vectara.add_files([file_path])
+    url = "https://api.vectara.io/v2/corpora/2/upload_file"  # Reemplaza ':corpus_key' con tu clave de corpus específica
+    headers = {
+        "Accept": "application/json",
+        "x-api-key": "zwt_nDJrRzeXqkymaH-tptpheMyOCzm4oL_NKD9hOw"  # Reemplaza <API_KEY_VALUE> con tu API Key de Vectara
+    }
+    files = {
+        "file": open(file_path, "rb")
+    }
+    response = requests.post(url, headers=headers, files=files)
+    if response.status_code == 200:
+        st.success("¡La respuesta satisfactoria se ha cargado exitosamente al corpus de Vectara!")
+    else:
+        st.error("Error al cargar la respuesta a Vectara. Código de estado: " + str(response.status_code))
+        st.error("Mensaje de error: " + response.text)
 
 # Indicador de satisfacción
 st.write("**¿Estás satisfecho con esta respuesta?**")

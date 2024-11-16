@@ -20,7 +20,7 @@ from datetime import datetime
 vectara = Vectara(
                 vectara_customer_id="2620549959",
                 vectara_corpus_id=2,
-                vectara_api_key="zwt_nDJrRzeXqkymaH-tptpheMyOCzm4oL_NKD9hOw"
+                vectara_api_key="zwt_nDJrR3X2jvq60t7xt0kmBzDOEWxIGt8ZJqloiQ"
             )
 
 # Configuraciones adicionales de Vectara
@@ -77,7 +77,7 @@ def upload_to_vectara(file_path):
     url = "https://api.vectara.io/v2/corpora/2/upload_file"  # Reemplaza ':corpus_key' con tu clave de corpus específica
     headers = {
         "Accept": "application/json",
-        "x-api-key": "zwt_nDJrRzeXqkymaH-tptpheMyOCzm4oL_NKD9hOw"  # Reemplaza <API_KEY_VALUE> con tu API Key de Vectara
+        "x-api-key": "zwt_nDJrR3X2jvq60t7xt0kmBzDOEWxIGt8ZJqloiQ"  # Reemplaza <API_KEY_VALUE> con tu API Key de Vectara
     }
     files = {
         "file": open(file_path, "rb")

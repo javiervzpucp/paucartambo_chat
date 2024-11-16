@@ -28,39 +28,17 @@ config = VectaraQueryConfig(
     k=10, lambda_val=0.0, rerank_config=rerank_config, summary_config=summary_config
 )
 
-# Google Sheets URL
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1jGwtHJNbIVCR4JwTRR_-yK4Yl_Csi6W7BiA87mQBVK4/gviz/tq?tqx=out:csv"
-GOOGLE_SHEET_EDIT_URL = "https://docs.google.com/spreadsheets/d/1jGwtHJNbIVCR4JwTRR_-yK4Yl_Csi6W7BiA87mQBVK4/edit"
-
-# Load data from Google Sheets
-@st.cache_data
-def load_data():
+# Store satisfactory responses in Vectara
+def save_to_vectara(query, response, satisfaction):
     try:
-        data = pd.read_csv(GOOGLE_SHEET_CSV_URL)
-        return data
+        vectara.add_texts(
+            texts=[
+                f"Query: {query}\nResponse: {response}\nSatisfaction: {satisfaction}"
+            ]
+        )
+        st.success("¡Respuesta satisfactoria guardada en Vectara!")
     except Exception as e:
-        return pd.DataFrame(columns=["timestamp", "query", "response"])
-
-# Append satisfactory responses to a local CSV for manual upload
-def append_to_csv(new_row):
-    try:
-        # Load existing data
-        try:
-            data = pd.read_csv("satisfactory_responses.csv")
-        except FileNotFoundError:
-            data = pd.DataFrame(columns=["timestamp", "query", "response"])
-
-        # Append the new row
-        updated_data = pd.concat([data, pd.DataFrame([new_row])], ignore_index=True)
-
-        # Save updated data locally
-        updated_data.to_csv("satisfactory_responses.csv", index=False)
-
-        # Provide instructions for manual upload
-        st.info("Responses saved locally in 'satisfactory_responses.csv'.")
-        st.info(f"Please upload this file to the Google Sheet: {GOOGLE_SHEET_EDIT_URL}")
-    except Exception as e:
-        st.error(f"Error saving response: {e}")
+        st.error(f"Error al guardar la respuesta en Vectara: {e}")
 
 # Title
 st.markdown("<h1 style='font-size: 36px;'>Prototipo de chat sobre las Devociones Marianas de Paucartambo</h1>", unsafe_allow_html=True)
@@ -88,34 +66,29 @@ for pregunta in preguntas_sugeridas:
     if st.button(pregunta):
         selected_question = pregunta
 
-# Text input for a custom query
+# Input for custom questions
 query_str = st.text_input(
     "Pregunta algo sobre Devociones Marianas o Danzas de Paucartambo:",
     value=selected_question if selected_question else "",
 )
 
-# Query Vectara for a response
+# Query Vectara
 rag = vectara.as_chat(config)
 response = rag.invoke(query_str)
 
-# Display the generated response
+# Display response
 st.write("**Respuesta:**")
-st.write(response.get('answer', "Lo siento, no tengo suficiente información para responder a tu pregunta."))
+response_text = response.get("answer", "Lo siento, no tengo suficiente información para responder a tu pregunta.")
+st.write(response_text)
 
-# Display saved responses from Google Sheets
-st.write("**Respuestas satisfactorias guardadas:**")
-data = load_data()
-if not data.empty:
-    st.write(data)
-else:
-    st.info("No hay respuestas satisfactorias guardadas aún. ¡Sé el primero en enviar una!")
+# Thumbs-up and Thumbs-down buttons for feedback
+st.write("**¿Esta respuesta fue satisfactoria?**")
+col1, col2 = st.columns(2)
 
-# Collect user feedback for satisfactory response
-if st.button("Guardar esta respuesta como satisfactoria"):
-    new_row = {
-        "timestamp": datetime.now().isoformat(),  # Timestamp
-        "query": query_str,                      # User query
-        "response": response.get('answer', "No response available"),  # Response
-    }
-    append_to_csv(new_row)
-    st.success("¡Respuesta satisfactoria guardada!")
+with col1:
+    if st.button("👍 Sí"):
+        save_to_vectara(query_str, response_text, "Satisfactoria")
+
+with col2:
+    if st.button("👎 No"):
+        save_to_vectara(query_str, response_text, "No satisfactoria")

@@ -34,7 +34,7 @@ if "response" not in st.session_state:
     st.session_state.response = ""
 
 # Store satisfactory responses in Vectara under a single document
-def save_to_vectara(query, response, satisfaction, document_id="satisfactory_responses_doc"):
+def save_to_vectara(query, response, satisfaction, document_id="2560b95df098dda376512766f44af3e0"):
     """
     Save feedback into a single document in Vectara.
 

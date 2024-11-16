@@ -7,7 +7,7 @@ Created on Thu Nov 14 11:08:21 2024
 
 import streamlit as st
 import pandas as pd
-import json
+import requests
 from langchain_community.vectorstores import Vectara
 from langchain_community.vectorstores.vectara import (
     RerankConfig,
@@ -16,27 +16,63 @@ from langchain_community.vectorstores.vectara import (
 )
 from datetime import datetime
 
-# Configuración de Vectara
+# Vectara Configuration
 vectara = Vectara(
-                vectara_customer_id="2620549959",
-                vectara_corpus_id=2,
-                vectara_api_key="zwt_nDJrR3X2jvq60t7xt0kmBzDOEWxIGt8ZJqloiQ"
-            )
+    vectara_customer_id="2620549959",
+    vectara_corpus_id=2,
+    vectara_api_key="zwt_nDJrR3X2jvq60t7xt0kmBzDOEWxIGt8ZJqloiQ",
+)
 
-# Configuraciones adicionales de Vectara
 summary_config = SummaryConfig(is_enabled=True, max_results=5, response_lang="spa")
 rerank_config = RerankConfig(reranker="mmr", rerank_k=50, mmr_diversity_bias=0.1)
 config = VectaraQueryConfig(
     k=10, lambda_val=0.0, rerank_config=rerank_config, summary_config=summary_config
 )
 
-# Título grande
+# Public Google Sheets URLs
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1jGwtHJNbIVCR4JwTRR_-yK4Yl_Csi6W7BiA87mQBVK4/gviz/tq?tqx=out:csv"
+GOOGLE_SHEET_EDIT_URL = "https://docs.google.com/spreadsheets/d/1jGwtHJNbIVCR4JwTRR_-yK4Yl_Csi6W7BiA87mQBVK4/edit"
+
+
+# Load data from Google Sheets
+@st.cache
+def load_data():
+    try:
+        data = pd.read_csv(GOOGLE_SHEET_CSV_URL)
+        return data
+    except Exception as e:
+        st.error(f"Error loading data from Google Sheets: {e}")
+        return pd.DataFrame(columns=["timestamp", "query", "response"])
+
+# Append new data to Google Sheets (Save locally)
+def append_to_google_sheet(new_row):
+    try:
+        # Load existing data
+        data = load_data()
+
+        # Append the new row
+        updated_data = pd.concat([data, pd.DataFrame([new_row])], ignore_index=True)
+
+        # Save updated data locally (overwrite old file)
+        updated_data.to_csv("updated_sheet.csv", index=False)
+
+        # Provide instructions to manually upload the updated CSV
+        st.info("The updated responses have been saved locally as 'updated_sheet.csv'.")
+        st.info(f"Please upload this file to the Google Sheet via {GOOGLE_SHEET_EDIT_URL}.")
+    except Exception as e:
+        st.error(f"Error updating Google Sheets: {e}")
+
+# Title
 st.markdown("<h1 style='font-size: 36px;'>Prototipo de chat sobre las Devociones Marianas de Paucartambo</h1>", unsafe_allow_html=True)
 
-# Mostrar imagen debajo del título con use_container_width
-st.image("https://raw.githubusercontent.com/javiervzpucp/paucartambo/main/imagenes/1.png", caption="Virgen del Carmen de Paucartambo", use_container_width=True)
+# Display an image below the title
+st.image(
+    "https://raw.githubusercontent.com/javiervzpucp/paucartambo/main/imagenes/1.png",
+    caption="Virgen del Carmen de Paucartambo",
+    use_container_width=True,
+)
 
-# Lista de preguntas sugeridas
+# Suggested questions
 preguntas_sugeridas = [
     "¿Qué danzas se presentan en honor a la Mamacha Carmen?",
     "¿Cuál es el origen de las devociones marianas en Paucartambo?",
@@ -45,71 +81,37 @@ preguntas_sugeridas = [
     "¿Cuál es el significado de las vestimentas en las danzas?",
 ]
 
-# Pregunta inicial predeterminada
-pregunta_inicial = "¿Qué danzas se presentan en honor a la Mamacha Carmen?"
-
-# Variable para almacenar la pregunta seleccionada
-selected_question = pregunta_inicial
-
-# Mostrar preguntas sugeridas como botones tipo cajita
+# Dropdown to select a suggested question
 st.write("**Preguntas sugeridas**")
-for pregunta in preguntas_sugeridas:
-    if st.button(pregunta):
-        selected_question = pregunta  # Almacenar la pregunta seleccionada
+selected_question = st.selectbox("Selecciona una pregunta sugerida:", preguntas_sugeridas)
 
-# Campo de entrada para consulta personalizada, prellenado con la pregunta seleccionada si existe
+# Text input for a custom query
 query_str = st.text_input(
-    "Pregunta algo sobre Devociones Marianas o Danzas de Paucartambo. "
-    "En lo posible, te sugerimos formular preguntas específicas.",
-    value=selected_question
+    "Pregunta algo sobre Devociones Marianas o Danzas de Paucartambo:",
+    value=selected_question,
 )
 
-# Llamada al modelo con la consulta seleccionada o personalizada
+# Query Vectara for a response
 rag = vectara.as_chat(config)
-resp = rag.invoke(query_str)
+response = rag.invoke(query_str)
 
-# Mostrar la respuesta
-st.write("**Respuesta**")
-st.write(resp['answer'])
+# Display the generated response
+st.write("**Respuesta:**")
+st.write(response.get('answer', "Lo siento, no tengo suficiente información para responder a tu pregunta."))
 
-# Ruta del archivo JSON para guardar respuestas satisfactorias
-satisfactory_responses_file = "satisfactory_responses.json"
+# Display saved responses from Google Sheets
+st.write("**Respuestas guardadas:**")
+data = load_data()
+if not data.empty:
+    st.write(data)
+else:
+    st.info("No hay respuestas guardadas aún.")
 
-# Función para guardar respuestas satisfactorias en un archivo JSON
-def save_to_json(file_path, query, response):
-    try:
-        # Leer contenido existente
-        try:
-            with open(file_path, "r") as file:
-                data = json.load(file)
-        except (FileNotFoundError, json.JSONDecodeError):
-            data = []
-
-        # Agregar nueva respuesta satisfactoria
-        data.append({
-            "timestamp": datetime.now().isoformat(),
-            "query": query,
-            "response": response
-        })
-
-        # Guardar en el archivo
-        with open(file_path, "w") as file:
-            json.dump(data, file, indent=4)
-
-        st.success("¡Respuesta satisfactoria guardada exitosamente en el archivo JSON!")
-    except Exception as e:
-        st.error(f"Error al guardar la respuesta: {e}")
-
-# Indicador de satisfacción
-st.write("**¿Estás satisfecho con esta respuesta?**")
-col1, col2 = st.columns(2)
-
-with col1:
-    if st.button("😊 Sí, estoy feliz con la respuesta"):
-        # Guardar respuesta satisfactoria en archivo JSON
-        save_to_json(satisfactory_responses_file, query_str, resp['answer'])
-        st.success("Gracias por tu retroalimentación. ¡Esto ayudará a mejorar futuras respuestas!")
-
-with col2:
-    if st.button("😞 No, no estoy feliz con la respuesta"):
-        st.info("Gracias por tu retroalimentación. Trabajaremos para mejorar.")
+# Collect user feedback
+if st.button("Guardar esta respuesta como satisfactoria"):
+    new_row = {
+        "timestamp": datetime.now().isoformat(),
+        "query": query_str,
+        "response": response.get('answer', "No response available"),
+    }
+    append_to_google_sheet(new_row)

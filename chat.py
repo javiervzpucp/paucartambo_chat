@@ -74,20 +74,7 @@ st.write(resp['answer'])
 
 # Función para cargar el archivo a Vectara
 def upload_to_vectara(file_path):
-    url = "https://api.vectara.io/v2/corpora/2/upload_file"  # Reemplaza ':corpus_key' con tu clave de corpus específica
-    headers = {
-        "Accept": "application/json",
-        "x-api-key": "zqt_nDJrRzuEwpSstPngTiTio43sQzykyJ1x6PebAQ"  # Reemplaza <API_KEY_VALUE> con tu API Key de Vectara
-    }
-    files = {
-        "file": open(file_path, "rb")
-    }
-    response = requests.post(url, headers=headers, files=files)
-    if response.status_code == 200:
-        st.success("¡La respuesta satisfactoria se ha cargado exitosamente al corpus de Vectara!")
-    else:
-        st.error("Error al cargar la respuesta a Vectara. Código de estado: " + str(response.status_code))
-        st.error("Mensaje de error: " + response.text)
+   vectara.add_files([file_path])
 
 # Indicador de satisfacción
 st.write("**¿Estás satisfecho con esta respuesta?**")

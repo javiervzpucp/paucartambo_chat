@@ -7,14 +7,13 @@ Created on Thu Nov 14 11:08:21 2024
 
 import streamlit as st
 import pandas as pd
-import requests
+from datetime import datetime
 from langchain_community.vectorstores import Vectara
 from langchain_community.vectorstores.vectara import (
     RerankConfig,
     SummaryConfig,
     VectaraQueryConfig,
 )
-from datetime import datetime
 
 # Vectara Configuration
 vectara = Vectara(
@@ -29,23 +28,21 @@ config = VectaraQueryConfig(
     k=10, lambda_val=0.0, rerank_config=rerank_config, summary_config=summary_config
 )
 
-# Public Google Sheets URLs
+# Google Sheet setup
 GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1jGwtHJNbIVCR4JwTRR_-yK4Yl_Csi6W7BiA87mQBVK4/gviz/tq?tqx=out:csv"
 GOOGLE_SHEET_EDIT_URL = "https://docs.google.com/spreadsheets/d/1jGwtHJNbIVCR4JwTRR_-yK4Yl_Csi6W7BiA87mQBVK4/edit"
 
-
 # Load data from Google Sheets
-@st.cache
+@st.cache_data
 def load_data():
     try:
         data = pd.read_csv(GOOGLE_SHEET_CSV_URL)
         return data
-    except Exception as e:
-        st.error(f"Error loading data from Google Sheets: {e}")
+    except Exception:
         return pd.DataFrame(columns=["timestamp", "query", "response"])
 
-# Append new data to Google Sheets (Save locally)
-def append_to_google_sheet(new_row):
+# Append satisfactory responses to a local CSV for manual upload
+def append_satisfactory_response(new_row):
     try:
         # Load existing data
         data = load_data()
@@ -54,13 +51,13 @@ def append_to_google_sheet(new_row):
         updated_data = pd.concat([data, pd.DataFrame([new_row])], ignore_index=True)
 
         # Save updated data locally (overwrite old file)
-        updated_data.to_csv("updated_sheet.csv", index=False)
+        updated_data.to_csv("updated_satisfactory_responses.csv", index=False)
 
         # Provide instructions to manually upload the updated CSV
-        st.info("The updated responses have been saved locally as 'updated_sheet.csv'.")
+        st.info("The updated satisfactory responses have been saved locally as 'updated_satisfactory_responses.csv'.")
         st.info(f"Please upload this file to the Google Sheet via {GOOGLE_SHEET_EDIT_URL}.")
     except Exception as e:
-        st.error(f"Error updating Google Sheets: {e}")
+        st.error(f"Error saving satisfactory response: {e}")
 
 # Title
 st.markdown("<h1 style='font-size: 36px;'>Prototipo de chat sobre las Devociones Marianas de Paucartambo</h1>", unsafe_allow_html=True)
@@ -81,14 +78,17 @@ preguntas_sugeridas = [
     "¿Cuál es el significado de las vestimentas en las danzas?",
 ]
 
-# Dropdown to select a suggested question
+# Show suggested questions as buttons
 st.write("**Preguntas sugeridas**")
-selected_question = st.selectbox("Selecciona una pregunta sugerida:", preguntas_sugeridas)
+selected_question = None
+for pregunta in preguntas_sugeridas:
+    if st.button(pregunta):
+        selected_question = pregunta
 
 # Text input for a custom query
 query_str = st.text_input(
     "Pregunta algo sobre Devociones Marianas o Danzas de Paucartambo:",
-    value=selected_question,
+    value=selected_question if selected_question else "",
 )
 
 # Query Vectara for a response
@@ -100,18 +100,19 @@ st.write("**Respuesta:**")
 st.write(response.get('answer', "Lo siento, no tengo suficiente información para responder a tu pregunta."))
 
 # Display saved responses from Google Sheets
-st.write("**Respuestas guardadas:**")
+st.write("**Respuestas satisfactorias guardadas:**")
 data = load_data()
 if not data.empty:
     st.write(data)
 else:
-    st.info("No hay respuestas guardadas aún.")
+    st.info("No hay respuestas satisfactorias guardadas aún. ¡Sé el primero en enviar una!")
 
-# Collect user feedback
+# Collect user feedback for satisfactory response
 if st.button("Guardar esta respuesta como satisfactoria"):
     new_row = {
         "timestamp": datetime.now().isoformat(),
         "query": query_str,
         "response": response.get('answer', "No response available"),
     }
-    append_to_google_sheet(new_row)
+    append_satisfactory_response(new_row)
+    st.success("¡Respuesta satisfactoria guardada!")

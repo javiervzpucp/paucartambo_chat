@@ -6,7 +6,6 @@ Created on Thu Nov 14 11:08:21 2024
 """
 
 import streamlit as st
-import pandas as pd
 from datetime import datetime
 from langchain_community.vectorstores import Vectara
 from langchain_community.vectorstores.vectara import (
@@ -28,6 +27,12 @@ config = VectaraQueryConfig(
     k=10, lambda_val=0.0, rerank_config=rerank_config, summary_config=summary_config
 )
 
+# Initialize session state for query and response persistence
+if "query" not in st.session_state:
+    st.session_state.query = ""
+if "response" not in st.session_state:
+    st.session_state.response = ""
+
 # Store satisfactory responses in Vectara
 def save_to_vectara(query, response, satisfaction):
     try:
@@ -36,7 +41,7 @@ def save_to_vectara(query, response, satisfaction):
                 f"Query: {query}\nResponse: {response}\nSatisfaction: {satisfaction}"
             ]
         )
-        st.success("¡Respuesta satisfactoria guardada en Vectara!")
+        st.success(f"¡Respuesta marcada como '{satisfaction}' y guardada en Vectara!")
     except Exception as e:
         st.error(f"Error al guardar la respuesta en Vectara: {e}")
 
@@ -64,22 +69,24 @@ st.write("**Preguntas sugeridas**")
 selected_question = None
 for pregunta in preguntas_sugeridas:
     if st.button(pregunta):
-        selected_question = pregunta
+        st.session_state.query = pregunta  # Update session state query
 
 # Input for custom questions
 query_str = st.text_input(
     "Pregunta algo sobre Devociones Marianas o Danzas de Paucartambo:",
-    value=selected_question if selected_question else "",
+    value=st.session_state.query,
 )
 
-# Query Vectara
-rag = vectara.as_chat(config)
-response = rag.invoke(query_str)
+# Process query and get response
+if query_str and query_str != st.session_state.query:
+    st.session_state.query = query_str
+    rag = vectara.as_chat(config)
+    response = rag.invoke(query_str)
+    st.session_state.response = response.get("answer", "Lo siento, no tengo suficiente información para responder a tu pregunta.")
 
 # Display response
 st.write("**Respuesta:**")
-response_text = response.get("answer", "Lo siento, no tengo suficiente información para responder a tu pregunta.")
-st.write(response_text)
+st.write(st.session_state.response)
 
 # Thumbs-up and Thumbs-down buttons for feedback
 st.write("**¿Esta respuesta fue satisfactoria?**")
@@ -87,8 +94,8 @@ col1, col2 = st.columns(2)
 
 with col1:
     if st.button("👍 Sí"):
-        save_to_vectara(query_str, response_text, "Satisfactoria")
+        save_to_vectara(st.session_state.query, st.session_state.response, "Satisfactoria")
 
 with col2:
     if st.button("👎 No"):
-        save_to_vectara(query_str, response_text, "No satisfactoria")
+        save_to_vectara(st.session_state.query, st.session_state.response, "No satisfactoria")

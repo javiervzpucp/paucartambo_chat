@@ -7,7 +7,7 @@ Created on Thu Nov 14 11:08:21 2024
 
 import streamlit as st
 import pandas as pd
-import requests
+import json
 from langchain_community.vectorstores import Vectara
 from langchain_community.vectorstores.vectara import (
     RerankConfig,
@@ -72,45 +72,42 @@ resp = rag.invoke(query_str)
 st.write("**Respuesta**")
 st.write(resp['answer'])
 
-# Función para cargar el archivo a Vectara
-def upload_to_vectara(file_path):
-    url = "https://api.vectara.io/v2/corpora/2/upload_file"  # Reemplaza ':corpus_key' con tu clave de corpus específica
-    headers = {
-        "Accept": "application/json",
-        "x-api-key": "zwt_nDJrR3X2jvq60t7xt0kmBzDOEWxIGt8ZJqloiQ"  # Reemplaza <API_KEY_VALUE> con tu API Key de Vectara
-    }
-    files = {
-        "file": open(file_path, "rb")
-    }
-    response = requests.post(url, headers=headers, files=files)
-    if response.status_code == 200:
-        st.success("¡La respuesta satisfactoria se ha cargado exitosamente al corpus de Vectara!")
-    else:
-        st.error("Error al cargar la respuesta a Vectara. Código de estado: " + str(response.status_code))
-        st.error("Mensaje de error: " + response.text)
+# Ruta del archivo JSON para guardar respuestas satisfactorias
+satisfactory_responses_file = "satisfactory_responses.json"
+
+# Función para guardar respuestas satisfactorias en un archivo JSON
+def save_to_json(file_path, query, response):
+    try:
+        # Leer contenido existente
+        try:
+            with open(file_path, "r") as file:
+                data = json.load(file)
+        except (FileNotFoundError, json.JSONDecodeError):
+            data = []
+
+        # Agregar nueva respuesta satisfactoria
+        data.append({
+            "timestamp": datetime.now().isoformat(),
+            "query": query,
+            "response": response
+        })
+
+        # Guardar en el archivo
+        with open(file_path, "w") as file:
+            json.dump(data, file, indent=4)
+
+        st.success("¡Respuesta satisfactoria guardada exitosamente en el archivo JSON!")
+    except Exception as e:
+        st.error(f"Error al guardar la respuesta: {e}")
 
 # Indicador de satisfacción
 st.write("**¿Estás satisfecho con esta respuesta?**")
 col1, col2 = st.columns(2)
 
-# Ruta del archivo CSV para guardar respuestas satisfactorias
-file_path = "satisfactory_responses.csv"
-
 with col1:
     if st.button("😊 Sí, estoy feliz con la respuesta"):
-        # Guardar feedback positivo en un archivo CSV para agregar al corpus de Vectara posteriormente
-        satisfactory_feedback_data = {
-            "timestamp": [datetime.now()],
-            "query": [query_str],
-            "response": [resp['answer']],
-        }
-        satisfactory_feedback_df = pd.DataFrame(satisfactory_feedback_data)
-        satisfactory_feedback_df.to_csv(file_path, mode='a', header=False, index=False)
-        
-        # Subir archivo a Vectara
-        upload_to_vectara(file_path)
-        
-        # Mostrar mensaje de confirmación
+        # Guardar respuesta satisfactoria en archivo JSON
+        save_to_json(satisfactory_responses_file, query_str, resp['answer'])
         st.success("Gracias por tu retroalimentación. ¡Esto ayudará a mejorar futuras respuestas!")
 
 with col2:

@@ -1,36 +1,44 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Nov 16 14:18:19 2024
-
-@author: jveraz
-"""
-
 import requests
+import json
 
-url = "https://api.vectara.io/v1/index"
-headers = {
-    "Authorization": f"Bearer zqt_nDJrRzuEwpSstPngTiTio43sQzykyJ1x6PebAQ",  # Replace with your new API key
-    "Content-Type": "application/json",
-}
+# Updated API key with correct permissions
+api_key = "zwt_nDJrRwRHtr31pOA0qHxov2hKV61hdrbFupsptQ"
 
-data = {
-    "customer_id": "2620549959",  # Replace with your customer ID
-    "corpus_id": "2",                  # Replace with your corpus ID
-    "document": {
-        "document_id": "test-doc",
-        "title": "Test Upload",
-        "section": [
-            {
-                "text": "Testing Vectara integration.",
-                "lang": "en",
-            }
-        ],
+# API endpoint
+url = "https://api.vectara.io/v2/corpora/paucartambo/documents"
+
+# Payload
+payload = {
+    "id": "my-doc-id",  # Unique document ID
+    "type": "core",  # Document type
+    "metadata": {
+        "title": "A Nice Document",
+        "lang": "eng"
     },
+    "document_parts": [
+        {
+            "text": "I'm a nice document part.",
+            "metadata": {
+                "nice_rank": 9000
+            }
+        }
+    ]
 }
 
-response = requests.post(url, json=data, headers=headers)
+# Headers
+headers = {
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+    "x-api-key": api_key
+}
 
+# POST request
+response = requests.post(url, headers=headers, data=json.dumps(payload))
+
+# Response handling
 if response.status_code == 200:
-    print("Upload successful:", response.json())
+    print("Document successfully uploaded:", response.json())
 else:
     print(f"Error: {response.status_code}, {response.text}")
+
+

@@ -28,7 +28,7 @@ config = VectaraQueryConfig(
     k=10, lambda_val=0.0, rerank_config=rerank_config, summary_config=summary_config
 )
 
-# Google Sheet setup
+# Google Sheets URL
 GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1jGwtHJNbIVCR4JwTRR_-yK4Yl_Csi6W7BiA87mQBVK4/gviz/tq?tqx=out:csv"
 GOOGLE_SHEET_EDIT_URL = "https://docs.google.com/spreadsheets/d/1jGwtHJNbIVCR4JwTRR_-yK4Yl_Csi6W7BiA87mQBVK4/edit"
 
@@ -38,26 +38,29 @@ def load_data():
     try:
         data = pd.read_csv(GOOGLE_SHEET_CSV_URL)
         return data
-    except Exception:
+    except Exception as e:
         return pd.DataFrame(columns=["timestamp", "query", "response"])
 
 # Append satisfactory responses to a local CSV for manual upload
-def append_satisfactory_response(new_row):
+def append_to_csv(new_row):
     try:
         # Load existing data
-        data = load_data()
+        try:
+            data = pd.read_csv("satisfactory_responses.csv")
+        except FileNotFoundError:
+            data = pd.DataFrame(columns=["timestamp", "query", "response"])
 
         # Append the new row
         updated_data = pd.concat([data, pd.DataFrame([new_row])], ignore_index=True)
 
-        # Save updated data locally (overwrite old file)
-        updated_data.to_csv("updated_satisfactory_responses.csv", index=False)
+        # Save updated data locally
+        updated_data.to_csv("satisfactory_responses.csv", index=False)
 
-        # Provide instructions to manually upload the updated CSV
-        st.info("The updated satisfactory responses have been saved locally as 'updated_satisfactory_responses.csv'.")
-        st.info(f"Please upload this file to the Google Sheet via {GOOGLE_SHEET_EDIT_URL}.")
+        # Provide instructions for manual upload
+        st.info("Responses saved locally in 'satisfactory_responses.csv'.")
+        st.info(f"Please upload this file to the Google Sheet: {GOOGLE_SHEET_EDIT_URL}")
     except Exception as e:
-        st.error(f"Error saving satisfactory response: {e}")
+        st.error(f"Error saving response: {e}")
 
 # Title
 st.markdown("<h1 style='font-size: 36px;'>Prototipo de chat sobre las Devociones Marianas de Paucartambo</h1>", unsafe_allow_html=True)
@@ -110,9 +113,9 @@ else:
 # Collect user feedback for satisfactory response
 if st.button("Guardar esta respuesta como satisfactoria"):
     new_row = {
-        "timestamp": datetime.now().isoformat(),
-        "query": query_str,
-        "response": response.get('answer', "No response available"),
+        "timestamp": datetime.now().isoformat(),  # Timestamp
+        "query": query_str,                      # User query
+        "response": response.get('answer', "No response available"),  # Response
     }
-    append_satisfactory_response(new_row)
+    append_to_csv(new_row)
     st.success("¡Respuesta satisfactoria guardada!")

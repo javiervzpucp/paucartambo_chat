@@ -18,7 +18,7 @@ from neo4j import GraphDatabase
 load_dotenv()
 
 # Variables de entorno
-openai_api_key = os.getenv("OPENAI_API_KEY")
+openai_api_key = st.secrets['openai']["OPENAI_API_KEY"]#os.getenv("OPENAI_API_KEY")
 vectara_customer_id = os.getenv("VECTARA_CUSTOMER_ID")
 vectara_corpus_id = os.getenv("VECTARA_CORPUS_ID")
 vectara_api_key = os.getenv("VECTARA_API_KEY")

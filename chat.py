@@ -17,9 +17,14 @@ from neo4j import GraphDatabase
 # Cargar las variables de entorno desde el archivo .env
 load_dotenv()
 openai_api_key = "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"#os.getenv("OPENAI_API_KEY")
-neo4j_url = os.getenv("NEO4J_URI")
-neo4j_user = os.getenv("NEO4J_USERNAME")
-neo4j_pass = os.getenv("NEO4J_PASSWORD")
+#neo4j_url = os.getenv("NEO4J_URI")
+#neo4j_user = os.getenv("NEO4J_USERNAME")
+#neo4j_pass = os.getenv("NEO4J_PASSWORD")
+
+neo4j_url="neo4j+s://8c9ab5cb.databases.neo4j.io"
+neo4j_user="neo4j"
+neo4j_pass="EsxnRgeaaaGcqKSslig3di1IAl5l51yIj39lj7wWhyQ"
+
 
 
 ## Configurar el cliente de OpenAI

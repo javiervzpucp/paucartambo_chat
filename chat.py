@@ -102,11 +102,11 @@ if st.button("Responder"):
             st.write("**Respuesta generada:**")
             st.write(answer)
 
-            # Mostrar fuentes relevantes únicas
             st.write("**Documentos relacionados:**")
             for i, (source, content) in enumerate(unique_sources.items()):
-                st.write(f"Fuente {i+1}: {source}")
-                st.write(content)
+                with st.expander(f"Fuente {i+1}: {source}"):
+                    st.write(content)
+
 
             # Guardar la respuesta y la pregunta en la sesión
             st.session_state["last_query"] = query

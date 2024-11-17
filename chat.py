@@ -5,6 +5,8 @@ Created on Thu Nov 14 11:08:21 2024
 @author: jveraz
 """
 
+import os
+from dotenv import load_dotenv
 import streamlit as st
 from langchain_community.vectorstores import Vectara
 from langchain_community.vectorstores.vectara import (
@@ -12,13 +14,17 @@ from langchain_community.vectorstores.vectara import (
     SummaryConfig,
     VectaraQueryConfig,
 )
-from langchain.schema import Document
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
 from langchain.llms import OpenAI
 import networkx as nx
-from datetime import datetime
 from pyvis.network import Network
+from datetime import datetime
+
+# Cargar las variables de entorno desde el archivo .env
+load_dotenv()
+openai_api_key = os.getenv("OPENAI_API_KEY")
+
+# Configuración de OpenAI
+openai_llm = OpenAI(temperature=0, model="gpt-4", openai_api_key=openai_api_key)
 
 # Configuración de Vectara
 vectara = Vectara(
@@ -68,66 +74,7 @@ for pregunta in preguntas_sugeridas:
 # Entrada personalizada
 query_str = st.text_input("Pregunta algo sobre Devociones Marianas o Danzas de Paucartambo:", value=st.session_state.query)
 
-# Botón de respuesta
-if st.button("Responder"):
-    if query_str.strip():
-        st.session_state.query = query_str
-        rag = vectara.as_chat(config)
-        response = rag.invoke(query_str)
-        st.session_state.response = response.get("answer", "Lo siento, no tengo suficiente información para responder a tu pregunta.")
-    else:
-        st.warning("Por favor, ingresa una pregunta válida.")
-
-# Mostrar respuesta
-st.write("**Respuesta (editable):**")
-if st.session_state.response:
-    st.session_state.response = st.text_area(
-        "Edita la respuesta antes de guardar:",
-        value=st.session_state.response,
-        height=150,
-    )
-
-# Guardar respuestas satisfactorias en Vectara
-def save_to_vectara(query, response, satisfaction, document_id="2560b95df098dda376512766f44af3e0"):
-    try:
-        vectara.add_texts(
-            texts=[
-                f"Timestamp: {datetime.now().isoformat()}\n"
-                f"Query: {query}\n"
-                f"Response: {response}\n"
-                f"Satisfaction: {satisfaction}"
-            ],
-            document_id=document_id,  # Especificar el mismo ID de documento para adjuntar
-        )
-        st.success(f"¡Respuesta marcada como '{satisfaction}' y guardada en Vectara!")
-    except Exception as e:
-        st.error(f"Error al guardar la respuesta en Vectara: {e}")
-
-# Botones de retroalimentación
-col1, col2 = st.columns(2)
-with col1:
-    if st.button("👍 Satisfactoria"):
-        save_to_vectara(st.session_state.query, st.session_state.response, "Satisfactoria")
-with col2:
-    if st.button("👎 No satisfactoria"):
-        save_to_vectara(st.session_state.query, st.session_state.response, "No satisfactoria")
-
 # Construcción del Knowledge Graph
-st.write("### Grafo de Conocimiento")
-
-# Configuración de LangChain para extracción de relaciones
-llm = OpenAI(temperature=0)
-prompt_template = PromptTemplate(
-    input_variables=["text"],
-    template="""
-    Extrae entidades y sus relaciones en el formato:
-    [Entidad 1] -> [Relación] -> [Entidad 2]
-    Texto: {text}
-    """,
-)
-relation_extraction_chain = LLMChain(llm=llm, prompt=prompt_template)
-
-# Procesar documentos desde Vectara y construir el grafo
 def build_knowledge_graph():
     graph = nx.MultiDiGraph()
 
@@ -136,9 +83,9 @@ def build_knowledge_graph():
         documents = vectara.query("Devociones Marianas", config)
         for doc in documents:
             text = doc["text"]
-            result = relation_extraction_chain.run(text=text)
-            for line in result.split("\n"):
-                parts = line.split(" -> ")
+            sentences = text.split(".")  # Dividir el texto en oraciones simples
+            for sentence in sentences:
+                parts = sentence.split(" -> ")  # Formato esperado: entidad1 -> relación -> entidad2
                 if len(parts) == 3:
                     entity1, relation, entity2 = parts
                     graph.add_edge(entity1.strip(), entity2.strip(), relation=relation.strip())
@@ -156,8 +103,73 @@ def visualize_graph(graph):
     net_graph.show("graph.html")
     st.markdown("[Ver el grafo de conocimiento](graph.html)")
 
-# Construir y mostrar el grafo
+# Responder utilizando el grafo
+def answer_from_graph(graph, query):
+    for edge in graph.edges(data=True):
+        if query.lower() in edge[0].lower() or query.lower() in edge[2]["relation"].lower():
+            return f"De acuerdo al grafo: {edge[0]} -> {edge[2]['relation']} -> {edge[1]}"
+    return None
+
+# Guardar respuestas en Vectara
+def save_to_vectara(query, response, satisfaction, document_id="2560b95df098dda376512766f44af3e0"):
+    """
+    Guardar la respuesta marcada como satisfactoria o no en un documento específico de Vectara.
+    """
+    try:
+        vectara.add_texts(
+            texts=[
+                f"Timestamp: {datetime.now().isoformat()}\n"
+                f"Query: {query}\n"
+                f"Response: {response}\n"
+                f"Satisfaction: {satisfaction}"
+            ],
+            document_id=document_id,
+        )
+        st.success(f"¡Respuesta marcada como '{satisfaction}' y guardada en Vectara!")
+    except Exception as e:
+        st.error(f"Error al guardar la respuesta en Vectara: {e}")
+
+# Procesar la consulta
+if st.button("Responder"):
+    if query_str.strip():
+        st.session_state.query = query_str
+
+        # Intentar responder desde el grafo
+        if st.session_state.graph is None:
+            st.session_state.graph = build_knowledge_graph()
+        graph_response = answer_from_graph(st.session_state.graph, query_str)
+
+        if graph_response:
+            st.session_state.response = graph_response
+        else:
+            # Si no hay respuesta en el grafo, usar el modelo
+            rag = vectara.as_chat(config)
+            response = rag.invoke(query_str)
+            st.session_state.response = response.get("answer", "Lo siento, no tengo suficiente información para responder a tu pregunta.")
+    else:
+        st.warning("Por favor, ingresa una pregunta válida.")
+
+# Mostrar respuesta
+st.write("**Respuesta (editable):**")
+if st.session_state.response:
+    st.session_state.response = st.text_area(
+        "Edita la respuesta antes de guardar:",
+        value=st.session_state.response,
+        height=150,
+    )
+
+# Botones de retroalimentación
+col1, col2 = st.columns(2)
+with col1:
+    if st.button("👍 Satisfactoria"):
+        save_to_vectara(st.session_state.query, st.session_state.response, "Satisfactoria")
+with col2:
+    if st.button("👎 No satisfactoria"):
+        save_to_vectara(st.session_state.query, st.session_state.response, "No satisfactoria")
+
+# Generar el grafo de conocimiento
 if st.button("Generar Grafo de Conocimiento"):
-    st.session_state.graph = build_knowledge_graph()
+    if st.session_state.graph is None:
+        st.session_state.graph = build_knowledge_graph()
     if st.session_state.graph:
         visualize_graph(st.session_state.graph)

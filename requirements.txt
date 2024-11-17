@@ -6,17 +6,19 @@ annotated-types==0.7.0
 anyio==4.6.2.post1
 attrs==24.2.0
 blinker==1.9.0
+Brotli @ file:///C:/b/abs_3d36mno480/croot/brotli-split_1714483178642/work
 cachetools==5.5.0
-certifi==2024.8.30
+certifi @ file:///home/conda/feedstock_root/build_artifacts/certifi_1725278078093/work/certifi
+cffi @ file:///C:/b/abs_90yq4lmu83/croot/cffi_1726856448345/work
 chardet==3.0.4
-charset-normalizer==3.4.0
+charset-normalizer @ file:///home/conda/feedstock_root/build_artifacts/charset-normalizer_1728479282467/work
 click==8.1.7
 colorama==0.4.6
 dataclasses-json==0.6.7
 frozenlist==1.5.0
 gitdb==4.0.11
 GitPython==3.1.43
-googletrans==3.0.0
+googletrans==2.4.0
 greenlet==3.1.1
 h11==0.9.0
 h2==3.2.0
@@ -53,17 +55,19 @@ pillow==11.0.0
 propcache==0.2.0
 protobuf==5.28.3
 pyarrow==18.0.0
+pycparser @ file:///home/conda/feedstock_root/build_artifacts/pycparser_1711811537435/work
 pydantic==2.9.2
 pydantic-settings==2.6.1
 pydantic_core==2.23.4
 pydeck==0.9.1
 Pygments==2.18.0
+PySocks @ file:///D:/bld/pysocks_1661604991356/work
 python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
 pytz==2024.2
 PyYAML==6.0.2
 referencing==0.35.1
-requests==2.32.3
+requests @ file:///home/conda/feedstock_root/build_artifacts/requests_1717057054362/work
 requests-toolbelt==1.0.0
 rfc3986==1.5.0
 rich==13.9.4
@@ -80,7 +84,9 @@ tornado==6.4.1
 typing-inspect==0.9.0
 typing_extensions==4.12.2
 tzdata==2024.2
-urllib3==2.2.3
+urllib3 @ file:///home/conda/feedstock_root/build_artifacts/urllib3_1726496430923/work
 watchdog==6.0.0
 wheel==0.44.0
+win_inet_pton @ file:///D:/bld/win_inet_pton_1727796272493/work
 yarl==1.17.1
+zstandard @ file:///C:/b/abs_31t8xmrv_h/croot/zstandard_1731356578015/work

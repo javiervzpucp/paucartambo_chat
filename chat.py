@@ -17,10 +17,9 @@ import os
 load_dotenv()
 
 # Configuración de credenciales
-openai_api_key = st.secrets['openai']["OPENAI_API_KEY"]
 vectara_customer_id = 2620549959
 vectara_corpus_id = 2
-vectara_api_key = "zwt_nDJrR3X2jvq60t7xt0kmBzDOEWxIGt8ZJqloiQ"
+vectara_api_key = os.getenv("VECTARA_API_KEY")
 
 # Configuración de Vectara
 vectara = Vectara(
@@ -57,6 +56,9 @@ query = st.text_input("Pregunta algo sobre Devociones Marianas o Danzas de Pauca
 
 # Función para generar respuestas utilizando Vectara
 def fetch_vectara_response(query):
+    """
+    Genera respuestas utilizando Vectara.
+    """
     try:
         rag = vectara.as_chat()
         response = rag.invoke(query)
@@ -66,48 +68,48 @@ def fetch_vectara_response(query):
         return "Lo siento, hubo un error al generar la respuesta."
 
 # Generar respuesta
-response = ""
+if "response" not in st.session_state:
+    st.session_state.response = ""
+
 if st.button("Responder"):
     if query.strip():
-        response = fetch_vectara_response(query)
+        st.session_state.response = fetch_vectara_response(query)
         st.write("**Última respuesta generada:**")
         st.write(f"**Pregunta:** {query}")
-        st.write(f"**Respuesta:** {response}")
+        st.write(f"**Respuesta:** {st.session_state.response}")
     else:
         st.warning("Por favor, ingresa una pregunta válida.")
 
 # Exportar respuesta como .docx
-if response:
-    def export_to_doc(query, response):
-        """
-        Exporta la consulta y respuesta a un archivo .docx.
-        """
-        doc = Document()
-        doc.add_heading("Respuesta Generada", level=1)
-        doc.add_paragraph(f"Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        doc.add_paragraph(f"Pregunta: {query}")
-        doc.add_paragraph(f"Respuesta: {response}")
-        
-        buffer = BytesIO()
-        doc.save(buffer)
-        buffer.seek(0)
-        return buffer
+def export_to_doc(query, response):
+    """
+    Exporta la consulta y respuesta a un archivo .docx.
+    """
+    doc = Document()
+    doc.add_heading("Respuesta Generada", level=1)
+    doc.add_paragraph(f"Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    doc.add_paragraph(f"Pregunta: {query}")
+    doc.add_paragraph(f"Respuesta: {response}")
+    
+    buffer = BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
 
-    # Botón para descargar el archivo Word
-    if st.button("Exportar respuesta a Word"):
-        doc_file = export_to_doc(query, response)
-        st.download_button(
-            label="Descargar respuesta en formato Word",
-            data=doc_file,
-            file_name="respuesta_devociones.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
+if st.session_state.response:
+    doc_file = export_to_doc(query, st.session_state.response)
+    st.download_button(
+        label="Descargar respuesta en formato Word",
+        data=doc_file,
+        file_name="respuesta_devociones.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
 
     # Compartir en redes sociales
     st.write("**Compartir esta respuesta en redes sociales:**")
 
     # Crear enlaces para compartir
-    text = quote(f"Pregunta: {query}\nRespuesta: {response[:200]}...")
+    text = quote(f"Pregunta: {query}\nRespuesta: {st.session_state.response[:200]}...")
     twitter_url = f"https://twitter.com/intent/tweet?text={text}"
     linkedin_url = f"https://www.linkedin.com/sharing/share-offsite/?url={quote(text)}"
     facebook_url = f"https://www.facebook.com/sharer/sharer.php?u={quote(text)}"

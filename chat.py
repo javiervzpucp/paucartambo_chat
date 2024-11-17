@@ -74,21 +74,24 @@ preguntas_sugeridas = [
 
 # Mostrar preguntas sugeridas como botones
 st.write("**Preguntas sugeridas**")
-selected_question = None
 for pregunta in preguntas_sugeridas:
     if st.button(pregunta):
-        selected_question = pregunta
-        st.session_state.query = pregunta
+        st.session_state.query = pregunta  # Actualiza el estado de la consulta
+        st.session_state.response = None  # Reinicia la respuesta previa
+
+# Asegurar que `st.session_state.query` está inicializado
+if "query" not in st.session_state:
+    st.session_state.query = ""
 
 # Entrada personalizada
-query = st.text_input("Haz una pregunta relacionada con las Devociones Marianas de Paucartambo:", value=selected_question or "")
+query = st.text_input("Haz una pregunta relacionada con las Devociones Marianas de Paucartambo:", value=st.session_state.query)
 
 # Procesar consulta
 if st.button("Responder"):
     if query.strip():
         try:
+            st.session_state.query = query  # Guarda la última consulta
             response = rag.invoke(query)
-            st.session_state.query = query
             st.session_state.response = response["answer"]
 
             # Mostrar la respuesta generada
@@ -108,21 +111,22 @@ if st.button("Responder"):
         st.warning("Por favor, ingresa una pregunta válida.")
 
 # Retroalimentación del usuario
-st.write("**¿Esta respuesta fue satisfactoria?**")
-col1, col2 = st.columns(2)
+if "response" in st.session_state and st.session_state.response:
+    st.write("**¿Esta respuesta fue satisfactoria?**")
+    col1, col2 = st.columns(2)
 
-with col1:
-    if st.button("👍 Sí"):
-        save_to_vectara(
-            query=st.session_state["query"],
-            response=st.session_state["response"],
-            satisfaction="Satisfactoria"
-        )
+    with col1:
+        if st.button("👍 Sí"):
+            save_to_vectara(
+                query=st.session_state["query"],
+                response=st.session_state["response"],
+                satisfaction="Satisfactoria"
+            )
 
-with col2:
-    if st.button("👎 No"):
-        save_to_vectara(
-            query=st.session_state["query"],
-            response=st.session_state["response"],
-            satisfaction="No satisfactoria"
-        )
+    with col2:
+        if st.button("👎 No"):
+            save_to_vectara(
+                query=st.session_state["query"],
+                response=st.session_state["response"],
+                satisfaction="No satisfactoria"
+            )

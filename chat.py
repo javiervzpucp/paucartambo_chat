@@ -5,28 +5,64 @@ Created on Thu Nov 14 11:08:21 2024
 """
 
 import streamlit as st
-from docx import Document
-from io import BytesIO
-from urllib.parse import quote
-from datetime import datetime
 from langchain_community.vectorstores import Vectara
+from langchain_community.vectorstores.vectara import VectaraQueryConfig
 from dotenv import load_dotenv
+from datetime import datetime
 import os
+import requests
 
-# Cargar las variables de entorno desde el archivo .env
+# Cargar las variables de entorno desde el archivo secrets.toml
+load_dotenv()
+
+# Configuración de credenciales
 vectara_customer_id = st.secrets["vectara"]["CUSTOMER_ID"]
 vectara_corpus_id = st.secrets["vectara"]["CORPUS_ID"]
 vectara_api_key = st.secrets["vectara"]["API_KEY"]
 
-# Configuración de Vectara
+# Validar que todas las variables se hayan cargado correctamente
+if not vectara_customer_id or not vectara_corpus_id or not vectara_api_key:
+    raise ValueError("Falta información de Vectara. Configúrala en el archivo secrets.toml")
+
+# Inicializar cliente de Vectara
 vectara = Vectara(
-    vectara_customer_id=str(vectara_customer_id),
+    vectara_customer_id=vectara_customer_id,
     vectara_corpus_id=vectara_corpus_id,
     vectara_api_key=vectara_api_key,
 )
 
-# Configuración de la app
-st.title("Prototipo de Chat sobre Devociones Marianas de Paucartambo")
+# Configuración de la consulta
+config = VectaraQueryConfig(
+    k=10,  # Número de resultados a retornar
+    lambda_val=0.0  # Parámetro para ajustar el equilibrio entre relevancia y contexto
+)
+
+# Crear cliente RAG (Retrieve and Generate)
+rag = vectara.as_chat(config)
+
+# Función para guardar respuestas satisfactorias en Vectara
+def save_to_vectara(query, response, satisfaction, document_id="2560b95df098dda376512766f44af3e0"):
+    """
+    Guarda las respuestas satisfactorias en Vectara.
+    """
+    try:
+        vectara.add_texts(
+            texts=[
+                f"Timestamp: {datetime.now().isoformat()}\n"
+                f"Query: {query}\n"
+                f"Response: {response}\n"
+                f"Satisfaction: {satisfaction}"
+            ],
+            document_id=document_id
+        )
+        st.success(f"¡Respuesta marcada como '{satisfaction}' y guardada en Vectara!")
+    except Exception as e:
+        st.error(f"Error al guardar la respuesta en Vectara: {e}")
+
+# Interfaz de Streamlit
+st.title("Prototipo de Chat sobre las Devociones Marianas de Paucartambo")
+
+# Mostrar imagen
 st.image(
     "https://raw.githubusercontent.com/javiervzpucp/paucartambo/main/imagenes/1.png",
     caption="Virgen del Carmen de Paucartambo",
@@ -42,82 +78,56 @@ preguntas_sugeridas = [
     "¿Cuál es el significado de las vestimentas en las danzas?",
 ]
 
+# Mostrar preguntas sugeridas como botones
 st.write("**Preguntas sugeridas**")
-selected_question = None
 for pregunta in preguntas_sugeridas:
     if st.button(pregunta):
-        st.session_state.query = pregunta
+        st.session_state["query"] = pregunta  # Actualizar la consulta seleccionada
 
-# Input de consulta personalizada
-query = st.text_input("Pregunta algo sobre Devociones Marianas o Danzas de Paucartambo:", value="")
+# Entrada personalizada
+query = st.text_input("Haz una pregunta relacionada con las Devociones Marianas de Paucartambo:")
 
-# Función para generar respuestas utilizando Vectara
-def fetch_vectara_response(query):
-    """
-    Genera respuestas utilizando Vectara.
-    """
-    try:
-        rag = vectara.as_chat()
-        response = rag.invoke(query)
-        return response.get("answer", "Lo siento, no tengo suficiente información para responder a tu pregunta.")
-    except Exception as e:
-        st.error(f"Error al consultar Vectara: {e}")
-        return "Lo siento, hubo un error al generar la respuesta."
-
-# Generar respuesta
-if "response" not in st.session_state:
-    st.session_state.response = ""
-
+# Procesar consulta
 if st.button("Responder"):
     if query.strip():
-        st.session_state.response = fetch_vectara_response(query)
-        st.write("**Última respuesta generada:**")
-        st.write(f"**Pregunta:** {query}")
-        st.write(f"**Respuesta:** {st.session_state.response}")
+        # Obtener respuesta de Vectara
+        try:
+            response = rag.invoke(query)
+            st.session_state["query"] = query
+            st.session_state["response"] = response["answer"]
+            
+            # Mostrar la respuesta generada
+            st.write("**Última pregunta generada:**")
+            st.write(f"Pregunta: {st.session_state['query']}")
+            st.write(f"Respuesta: {st.session_state['response']}")
+
+            # Listar documentos fuente
+            st.write("**Documentos fuente:**")
+            source_documents = list(set([doc["source"] for doc in response["results"]]))
+            for doc in source_documents:
+                st.write(doc)
+
+        except Exception as e:
+            st.error(f"Error al consultar Vectara: {e}")
     else:
         st.warning("Por favor, ingresa una pregunta válida.")
 
-# Exportar respuesta como .docx
-def export_to_doc(query, response):
-    """
-    Exporta la consulta y respuesta a un archivo .docx.
-    """
-    doc = Document()
-    doc.add_heading("Respuesta Generada", level=1)
-    doc.add_paragraph(f"Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    doc.add_paragraph(f"Pregunta: {query}")
-    doc.add_paragraph(f"Respuesta: {response}")
-    
-    buffer = BytesIO()
-    doc.save(buffer)
-    buffer.seek(0)
-    return buffer
+# Retroalimentación del usuario
+st.write("**¿Esta respuesta fue satisfactoria?**")
+col1, col2 = st.columns(2)
 
-if st.session_state.response:
-    doc_file = export_to_doc(query, st.session_state.response)
-    st.download_button(
-        label="Descargar respuesta en formato Word",
-        data=doc_file,
-        file_name="respuesta_devociones.docx",
-        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    )
+with col1:
+    if st.button("👍 Sí"):
+        save_to_vectara(
+            query=st.session_state["query"],
+            response=st.session_state["response"],
+            satisfaction="Satisfactoria"
+        )
 
-    # Compartir en redes sociales
-    st.write("**Compartir esta respuesta en redes sociales:**")
-
-    # Crear enlaces para compartir
-    text = quote(f"Pregunta: {query}\nRespuesta: {st.session_state.response[:200]}...")
-    twitter_url = f"https://twitter.com/intent/tweet?text={text}"
-    linkedin_url = f"https://www.linkedin.com/sharing/share-offsite/?url={quote(text)}"
-    facebook_url = f"https://www.facebook.com/sharer/sharer.php?u={quote(text)}"
-
-    # Enlaces a redes sociales
-    st.markdown(
-        f"[Compartir en Twitter]({twitter_url})", unsafe_allow_html=True
-    )
-    st.markdown(
-        f"[Compartir en LinkedIn]({linkedin_url})", unsafe_allow_html=True
-    )
-    st.markdown(
-        f"[Compartir en Facebook]({facebook_url})", unsafe_allow_html=True
-    )
+with col2:
+    if st.button("👎 No"):
+        save_to_vectara(
+            query=st.session_state["query"],
+            response=st.session_state["response"],
+            satisfaction="No satisfactoria"
+        )

@@ -108,17 +108,19 @@ if st.button("Responder"):
                 st.write(f"Fuente {i+1}: {source}")
                 st.write(content)
 
-            # Guardar la respuesta en la sesión
+            # Guardar la respuesta y la pregunta en la sesión
+            st.session_state["last_query"] = query
             st.session_state["response"] = answer
         except Exception as e:
             st.error(f"Error: {e}")
     else:
         st.warning("Por favor, ingresa una pregunta válida.")
 
-# Mostrar respuesta generada si existe
-if "response" in st.session_state:
-    st.write("**Última respuesta generada:**")
-    st.write(st.session_state["response"])
+# Mostrar la última pregunta y respuesta generada si existen
+if "response" in st.session_state and "last_query" in st.session_state:
+    st.write("**Última pregunta y respuesta generada:**")
+    st.write(f"**Pregunta:** {st.session_state['last_query']}")
+    st.write(f"**Respuesta:** {st.session_state['response']}")
 
 # Retroalimentación del usuario
 st.write("**¿Esta respuesta fue útil?**")
@@ -141,7 +143,7 @@ def save_to_vectara(query, response):
 with col1:
     if st.button("👍 Sí"):
         try:
-            save_to_vectara(query, st.session_state["response"])
+            save_to_vectara(st.session_state["last_query"], st.session_state["response"])
         except Exception as e:
             st.error(f"Error: {e}")
 

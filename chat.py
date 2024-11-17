@@ -114,7 +114,6 @@ def create_knowledge_graph():
                     )
     return "Grafo de conocimiento creado desde archivos PDF."
 
-
 # Inicializar Knowledge Graph
 try:
     knowledge_graph_status = create_knowledge_graph()
@@ -168,10 +167,31 @@ def save_to_vectara(query, response, satisfaction, document_id="2560b95df098dda3
     except Exception as e:
         st.error(f"Error al guardar la respuesta en Vectara: {e}")
 
+# Función para mostrar preguntas recomendadas
+def display_recommended_questions(questions):
+    """
+    Muestra preguntas recomendadas como botones en Streamlit.
+    """
+    st.write("**Preguntas recomendadas:**")
+    for question in questions:
+        if st.button(question):
+            return question
+    return None
+
 # Interfaz de Streamlit
 st.title("Prototipo de Chat con Grafo de Conocimiento")
 
-query = st.text_input("Haz una pregunta relacionada con las Devociones Marianas de Paucartambo:")
+# Preguntas recomendadas
+recommended_questions = [
+    "¿Cuál es el origen de las Devociones Marianas?",
+    "¿Qué significa la Virgen del Carmen en Paucartambo?",
+    "¿Cómo se celebra la fiesta de la Virgen del Rosario?",
+]
+
+selected_question = display_recommended_questions(recommended_questions)
+
+# Entrada del usuario o pregunta seleccionada
+query = st.text_input("Haz una pregunta relacionada con las Devociones Marianas de Paucartambo:", value=selected_question or "")
 
 if st.button("Responder"):
     if query.strip():

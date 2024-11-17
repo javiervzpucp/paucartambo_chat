@@ -13,14 +13,17 @@ import os
 from langchain.chat_models import ChatOpenAI
 
 from neo4j import GraphDatabase
-import openai
+#import openai
 # Cargar las variables de entorno desde el archivo .env
 load_dotenv()
-openai_api_key = "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"#os.getenv("OPENAI_API_KEY")
+openai_api_key = os.getenv("OPENAI_API_KEY")
 neo4j_url = os.getenv("NEO4J_URI")
 neo4j_user = os.getenv("NEO4J_USERNAME")
 neo4j_pass = os.getenv("NEO4J_PASSWORD")
-
+print(openai_api_key)
+print(neo4j_pass)
+print(neo4j_user)
+print(neo4j_url)
 
 ## Configurar el cliente de OpenAI
 #openai_api_key = st.secrets["OPENAI_API_KEY"]

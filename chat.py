@@ -13,6 +13,7 @@ from neo4j import GraphDatabase
 from dotenv import load_dotenv
 from datetime import datetime
 import os
+from PyPDF2 import PdfReader
 
 # Cargar las variables de entorno desde el archivo .env
 load_dotenv()
@@ -39,13 +40,6 @@ client = ChatOpenAI(
     openai_api_key=openai_api_key
 )
 
-# Configuración de Vectara
-vectara = Vectara(
-    vectara_customer_id="2620549959",
-    vectara_corpus_id=2,
-    vectara_api_key="zwt_nDJrR3X2jvq60t7xt0kmBzDOEWxIGt8ZJqloiQ",
-)
-
 # Configuración de Neo4j
 graph_driver = GraphDatabase.driver(neo4j_url, auth=(neo4j_user, neo4j_pass))
 
@@ -68,62 +62,30 @@ def extract_context(query):
             context.append(f"{record['n']['content']} -[{record['r']['type']}]-> {record['m']['content']}")
     return "\n".join(context)
 
-import requests
-
-def fetch_vectara_documents(query):
-    """
-    Realiza una consulta a la API de Vectara para obtener documentos relacionados con la consulta proporcionada.
-
-    Args:
-        query (str): La consulta de búsqueda.
-
-    Returns:
-        list: Una lista de resultados de documentos si la consulta es exitosa.
-
-    Raises:
-        Exception: Si ocurre algún error al consultar la API de Vectara.
-    """
-    # Endpoint de la API
-    url = "https://api.vectara.io/v1/query"
-
-    # Cabeceras de autenticación y tipo de contenido
-    headers = {
-        "Authorization": f"Bearer {vectara_api_key}",
-        "Content-Type": "application/json",
-    }
-
-    # Validar que la consulta no esté vacía
-    if not query or query.strip() == "":
-        query = "*"
-
-    # Crear el payload de la solicitud
-    payload = {
-        "query": query,
-        "customer_id": vectara_customer_id,
-        "corpus_id": vectara_corpus_id,
-    }
-
-    try:
-        # Realizar la solicitud POST a la API
-        response = requests.post(url, json=payload, headers=headers)
-
-        # Manejar la respuesta
-        if response.status_code == 200:
-            # Devolver los resultados de la consulta
-            return response.json().get("results", [])
-        else:
-            # Lanzar una excepción con detalles del error
-            raise Exception(f"Error al consultar Vectara: {response.status_code} - {response.text}")
-    except requests.exceptions.RequestException as e:
-        # Manejar errores relacionados con la red o solicitudes
-        raise Exception(f"Error de red al consultar Vectara: {str(e)}")
-
-
-
-
+# Función para procesar archivos PDF desde la carpeta "documentos"
 def create_knowledge_graph():
-    vectara_docs = fetch_vectara_documents(" ")
-    texts = [doc["content"] for doc in vectara_docs if "content" in doc]
+    """
+    Crea un grafo de conocimiento procesando documentos PDF en la carpeta 'documentos'.
+    """
+    folder_path = "documentos"  # Carpeta donde están los PDFs
+    if not os.path.exists(folder_path):
+        raise FileNotFoundError(f"La carpeta '{folder_path}' no existe.")
+
+    texts = []
+    # Leer y procesar los PDFs
+    for filename in os.listdir(folder_path):
+        if filename.endswith(".pdf"):
+            file_path = os.path.join(folder_path, filename)
+            try:
+                pdf_reader = PdfReader(file_path)
+                pdf_text = ""
+                for page in pdf_reader.pages:
+                    pdf_text += page.extract_text()
+                texts.append(pdf_text)
+            except Exception as e:
+                st.error(f"Error al leer el archivo {filename}: {e}")
+
+    # Generar grafo a partir de los textos extraídos
     llm_transformer = LLMGraphTransformer(llm=client)
 
     with graph_driver.session() as session:
@@ -150,11 +112,15 @@ def create_knowledge_graph():
                         target=edge["target"]["id"],
                         type=edge["type"]
                     )
-    return "Grafo de conocimiento creado."
+    return "Grafo de conocimiento creado desde archivos PDF."
 
 
 # Inicializar Knowledge Graph
-knowledge_graph_status = create_knowledge_graph()
+try:
+    knowledge_graph_status = create_knowledge_graph()
+    st.success(knowledge_graph_status)
+except Exception as e:
+    st.error(f"Error al crear el grafo de conocimiento: {e}")
 
 # Función para generar respuestas utilizando contexto del Knowledge Graph
 def generate_response_from_knowledge_graph(query, context):

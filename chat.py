@@ -14,7 +14,7 @@ from neo4j import GraphDatabase
 
 # Cargar las variables de entorno desde el archivo .env
 load_dotenv()
-openai_api_key = os.environ["OPENAI_API_KEY"]
+openai_api_key = os.getenv("OPENAI_API_KEY")
 neo4j_url = os.getenv("NEO4J_URI")
 neo4j_user = os.getenv("NEO4J_USERNAME")
 neo4j_pass = os.getenv("NEO4J_PASSWORD")

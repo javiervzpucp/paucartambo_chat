@@ -5,63 +5,31 @@ Created on Thu Nov 14 11:08:21 2024
 """
 
 import streamlit as st
+from docx import Document
+from io import BytesIO
 from langchain_community.vectorstores import Vectara
-from langchain_community.vectorstores.vectara import VectaraQueryConfig
-from dotenv import load_dotenv
 from datetime import datetime
+from dotenv import load_dotenv
 import os
 
-# Cargar las variables de entorno desde el archivo secrets.toml
+# Cargar las variables de entorno desde el archivo .env
 load_dotenv()
 
 # Configuración de credenciales
-vectara_customer_id = st.secrets["vectara"]["CUSTOMER_ID"]
-vectara_corpus_id = st.secrets["vectara"]["CORPUS_ID"]
-vectara_api_key = st.secrets["vectara"]["API_KEY"]
-
-# Validar credenciales
-if not vectara_customer_id or not vectara_corpus_id or not vectara_api_key:
-    raise ValueError("Falta información de Vectara. Configúrala en el archivo secrets.toml")
+openai_api_key = st.secrets['openai']["OPENAI_API_KEY"]
+vectara_customer_id = 2620549959
+vectara_corpus_id = 2
+vectara_api_key = "zwt_nDJrR3X2jvq60t7xt0kmBzDOEWxIGt8ZJqloiQ"
 
 # Inicializar cliente de Vectara
 vectara = Vectara(
-    vectara_customer_id=vectara_customer_id,
+    vectara_customer_id=str(vectara_customer_id),
     vectara_corpus_id=vectara_corpus_id,
     vectara_api_key=vectara_api_key,
 )
 
-# Configuración para consultas
-config = VectaraQueryConfig(
-    k=10,  # Número de resultados
-    lambda_val=0.0  # Parámetro para ajustar entre relevancia y contexto
-)
-rag = vectara.as_chat(config)
-
-# Función para guardar respuestas satisfactorias
-def save_to_vectara(query, response, satisfaction, document_id="2560b95df098dda376512766f44af3e0"):
-    try:
-        vectara.add_texts(
-            texts=[
-                f"Timestamp: {datetime.now().isoformat()}\n"
-                f"Query: {query}\n"
-                f"Response: {response}\n"
-                f"Satisfaction: {satisfaction}"
-            ],
-            document_id=document_id
-        )
-        st.success(f"¡Respuesta marcada como '{satisfaction}' y guardada en Vectara!")
-    except Exception as e:
-        st.error(f"Error al guardar la respuesta en Vectara: {e}")
-
-# Interfaz de Streamlit
-st.title("Prototipo de Chat sobre las Devociones Marianas de Paucartambo")
-
-# Mostrar imagen
-st.image(
-    "https://raw.githubusercontent.com/javiervzpucp/paucartambo/main/imagenes/1.png",
-    caption="Virgen del Carmen de Paucartambo",
-    use_container_width=True,
-)
+# Configuración de Streamlit
+st.title("Prototipo de Chat sobre Devociones Marianas de Paucartambo")
 
 # Preguntas sugeridas
 preguntas_sugeridas = [
@@ -72,61 +40,58 @@ preguntas_sugeridas = [
     "¿Cuál es el significado de las vestimentas en las danzas?",
 ]
 
-# Mostrar preguntas sugeridas como botones
 st.write("**Preguntas sugeridas**")
+selected_question = None
 for pregunta in preguntas_sugeridas:
     if st.button(pregunta):
-        st.session_state.query = pregunta  # Actualiza el estado de la consulta
-        st.session_state.response = None  # Reinicia la respuesta previa
+        st.session_state.query = pregunta
 
-# Asegurar que `st.session_state.query` está inicializado
-if "query" not in st.session_state:
-    st.session_state.query = ""
+# Input de consulta personalizada
+query = st.text_input("Pregunta algo sobre Devociones Marianas o Danzas de Paucartambo:", value="")
 
-# Entrada personalizada
-query = st.text_input("Haz una pregunta relacionada con las Devociones Marianas de Paucartambo:", value=st.session_state.query)
+# Función para generar respuestas utilizando Vectara
+def fetch_vectara_response(query):
+    try:
+        rag = vectara.as_chat()
+        response = rag.invoke(query)
+        return response.get("answer", "Lo siento, no tengo suficiente información para responder a tu pregunta.")
+    except Exception as e:
+        st.error(f"Error al consultar Vectara: {e}")
+        return "Lo siento, hubo un error al generar la respuesta."
 
-# Procesar consulta
+# Generar respuesta
+response = ""
 if st.button("Responder"):
     if query.strip():
-        try:
-            st.session_state.query = query  # Guarda la última consulta
-            response = rag.invoke(query)
-            st.session_state.response = response["answer"]
-
-            # Mostrar la respuesta generada
-            st.write("**Última pregunta generada:**")
-            st.write(f"Pregunta: {st.session_state['query']}")
-            st.write(f"Respuesta: {st.session_state['response']}")
-
-            # Listar documentos fuente sin duplicados
-            st.write("**Documentos fuente:**")
-            source_documents = list(set([doc["source"] for doc in response["results"]]))
-            for doc in source_documents:
-                st.write(doc)
-
-        except Exception as e:
-            st.error(f"Error al consultar Vectara: {e}")
+        response = fetch_vectara_response(query)
+        st.write("**Respuesta generada:**")
+        st.write(response)
     else:
         st.warning("Por favor, ingresa una pregunta válida.")
 
-# Retroalimentación del usuario
-if "response" in st.session_state and st.session_state.response:
-    st.write("**¿Esta respuesta fue satisfactoria?**")
-    col1, col2 = st.columns(2)
+# Exportar respuesta como .docx
+if response:
+    def export_to_doc(query, response):
+        """
+        Exporta la consulta y respuesta a un archivo .docx.
+        """
+        doc = Document()
+        doc.add_heading("Respuesta Generada", level=1)
+        doc.add_paragraph(f"Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        doc.add_paragraph(f"Pregunta: {query}")
+        doc.add_paragraph(f"Respuesta: {response}")
+        
+        buffer = BytesIO()
+        doc.save(buffer)
+        buffer.seek(0)
+        return buffer
 
-    with col1:
-        if st.button("👍 Sí"):
-            save_to_vectara(
-                query=st.session_state["query"],
-                response=st.session_state["response"],
-                satisfaction="Satisfactoria"
-            )
-
-    with col2:
-        if st.button("👎 No"):
-            save_to_vectara(
-                query=st.session_state["query"],
-                response=st.session_state["response"],
-                satisfaction="No satisfactoria"
-            )
+    # Botón para descargar el archivo Word
+    if st.button("Exportar respuesta a Word"):
+        doc_file = export_to_doc(query, response)
+        st.download_button(
+            label="Descargar respuesta en formato Word",
+            data=doc_file,
+            file_name="respuesta_devociones.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )

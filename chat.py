@@ -10,7 +10,6 @@ from langchain_community.vectorstores.vectara import VectaraQueryConfig
 from dotenv import load_dotenv
 from datetime import datetime
 import os
-import requests
 
 # Cargar las variables de entorno desde el archivo secrets.toml
 load_dotenv()
@@ -20,7 +19,7 @@ vectara_customer_id = st.secrets["vectara"]["CUSTOMER_ID"]
 vectara_corpus_id = st.secrets["vectara"]["CORPUS_ID"]
 vectara_api_key = st.secrets["vectara"]["API_KEY"]
 
-# Validar que todas las variables se hayan cargado correctamente
+# Validar credenciales
 if not vectara_customer_id or not vectara_corpus_id or not vectara_api_key:
     raise ValueError("Falta información de Vectara. Configúrala en el archivo secrets.toml")
 
@@ -31,20 +30,15 @@ vectara = Vectara(
     vectara_api_key=vectara_api_key,
 )
 
-# Configuración de la consulta
+# Configuración para consultas
 config = VectaraQueryConfig(
-    k=10,  # Número de resultados a retornar
-    lambda_val=0.0  # Parámetro para ajustar el equilibrio entre relevancia y contexto
+    k=10,  # Número de resultados
+    lambda_val=0.0  # Parámetro para ajustar entre relevancia y contexto
 )
-
-# Crear cliente RAG (Retrieve and Generate)
 rag = vectara.as_chat(config)
 
-# Función para guardar respuestas satisfactorias en Vectara
+# Función para guardar respuestas satisfactorias
 def save_to_vectara(query, response, satisfaction, document_id="2560b95df098dda376512766f44af3e0"):
-    """
-    Guarda las respuestas satisfactorias en Vectara.
-    """
     try:
         vectara.add_texts(
             texts=[
@@ -80,28 +74,29 @@ preguntas_sugeridas = [
 
 # Mostrar preguntas sugeridas como botones
 st.write("**Preguntas sugeridas**")
+selected_question = None
 for pregunta in preguntas_sugeridas:
     if st.button(pregunta):
-        st.session_state["query"] = pregunta  # Actualizar la consulta seleccionada
+        selected_question = pregunta
+        st.session_state.query = pregunta
 
 # Entrada personalizada
-query = st.text_input("Haz una pregunta relacionada con las Devociones Marianas de Paucartambo:")
+query = st.text_input("Haz una pregunta relacionada con las Devociones Marianas de Paucartambo:", value=selected_question or "")
 
 # Procesar consulta
 if st.button("Responder"):
     if query.strip():
-        # Obtener respuesta de Vectara
         try:
             response = rag.invoke(query)
-            st.session_state["query"] = query
-            st.session_state["response"] = response["answer"]
-            
+            st.session_state.query = query
+            st.session_state.response = response["answer"]
+
             # Mostrar la respuesta generada
             st.write("**Última pregunta generada:**")
             st.write(f"Pregunta: {st.session_state['query']}")
             st.write(f"Respuesta: {st.session_state['response']}")
 
-            # Listar documentos fuente
+            # Listar documentos fuente sin duplicados
             st.write("**Documentos fuente:**")
             source_documents = list(set([doc["source"] for doc in response["results"]]))
             for doc in source_documents:

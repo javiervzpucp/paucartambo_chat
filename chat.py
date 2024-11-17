@@ -9,7 +9,9 @@ from langchain_community.vectorstores import Vectara
 from dotenv import load_dotenv
 from datetime import datetime
 import os
-from langchain_openai import ChatOpenAI
+#from langchain_openai import ChatOpenAI
+from langchain.chat_models import ChatOpenAI
+
 from neo4j import GraphDatabase
 import openai
 # Cargar las variables de entorno desde el archivo .env

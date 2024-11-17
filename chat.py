@@ -13,6 +13,7 @@ from langchain_community.vectorstores.vectara import (
     SummaryConfig,
     VectaraQueryConfig,
 )
+import pdfkit
 
 # Vectara Configuration
 vectara = Vectara(
@@ -32,6 +33,8 @@ if "query" not in st.session_state:
     st.session_state.query = ""
 if "response" not in st.session_state:
     st.session_state.response = ""
+if "points" not in st.session_state:
+    st.session_state.points = 0
 
 # Store satisfactory responses in Vectara under a single document
 def save_to_vectara(query, response, satisfaction, document_id="2560b95df098dda376512766f44af3e0"):
@@ -58,7 +61,6 @@ def save_to_vectara(query, response, satisfaction, document_id="2560b95df098dda3
     except Exception as e:
         st.error(f"Error al guardar la respuesta en Vectara: {e}")
 
-
 # Title
 st.markdown("<h1 style='font-size: 36px;'>Prototipo de chat sobre las Devociones Marianas de Paucartambo</h1>", unsafe_allow_html=True)
 
@@ -68,6 +70,10 @@ st.image(
     caption="Virgen del Carmen de Paucartambo",
     use_container_width=True,
 )
+
+# Feature 1: Multilingual functionality
+st.write("**Selecciona el idioma**")
+language = st.selectbox("Elige el idioma:", ["Español", "Inglés", "Quechua"])
 
 # Suggested questions
 preguntas_sugeridas = [
@@ -109,6 +115,28 @@ if st.session_state.response:
         value=st.session_state.response,
         height=150,
     )
+
+# Feature 4: Knowledge trivia
+st.write("**Trivia sobre las devociones**")
+answer = st.radio("¿Quién lidera la procesión?", ["Saqras", "Chunchos", "Quollas"])
+if st.button("Enviar respuesta"):
+    if answer == "Chunchos":
+        st.success("¡Correcto! Los Chunchos lideran la procesión.")
+        st.session_state.points += 1
+    else:
+        st.error("Inténtalo de nuevo.")
+
+# Feature 5: Downloadable PDFs
+if st.button("Descargar Tradiciones en PDF"):
+    html_content = f"<h1>Devociones de Paucartambo</h1><p>{st.session_state.response}</p>"
+    pdfkit.from_string(html_content, "tradiciones.pdf")
+    with open("tradiciones.pdf", "rb") as file:
+        st.download_button("Descargar PDF", file, "tradiciones.pdf")
+
+# Feature 6: Gamification
+st.write(f"Tus puntos acumulados: {st.session_state.points}")
+if st.session_state.points > 5:
+    st.balloons()
 
 # Thumbs-up and Thumbs-down buttons for feedback
 st.write("**¿Esta respuesta fue satisfactoria?**")

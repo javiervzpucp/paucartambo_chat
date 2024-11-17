@@ -23,8 +23,13 @@ from datetime import datetime
 load_dotenv()
 openai_api_key = os.getenv("OPENAI_API_KEY")
 
-# Configuración de OpenAI
-openai_llm = OpenAI(temperature=0, model="gpt-4", openai_api_key=openai_api_key)
+from langchain.chat_models import ChatOpenAI
+
+llm = ChatOpenAI(
+    model_name="gpt-4",
+    temperature=0,
+    openai_api_key=openai_api_key
+)
 
 # Configuración de Vectara
 vectara = Vectara(

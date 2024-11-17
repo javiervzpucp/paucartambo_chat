@@ -16,10 +16,18 @@ from neo4j import GraphDatabase
 #import openai
 # Cargar las variables de entorno desde el archivo .env
 load_dotenv()
-openai_api_key = "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"#os.getenv("OPENAI_API_KEY")
-#neo4j_url = os.getenv("NEO4J_URI")
-#neo4j_user = os.getenv("NEO4J_USERNAME")
-#neo4j_pass = os.getenv("NEO4J_PASSWORD")
+
+# Variables de entorno
+openai_api_key = os.getenv("OPENAI_API_KEY")
+vectara_customer_id = os.getenv("VECTARA_CUSTOMER_ID")
+vectara_corpus_id = os.getenv("VECTARA_CORPUS_ID")
+vectara_api_key = os.getenv("VECTARA_API_KEY")
+
+# Validar que todas las variables se hayan cargado correctamente
+if not openai_api_key:
+    raise ValueError("Falta la API Key de OpenAI. Configúrala en el archivo .env")
+if not vectara_customer_id or not vectara_corpus_id or not vectara_api_key:
+    raise ValueError("Falta información de Vectara. Configúrala en el archivo .env")
 
 neo4j_url="neo4j+s://8c9ab5cb.databases.neo4j.io"
 neo4j_user="neo4j"

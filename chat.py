@@ -102,15 +102,34 @@ if st.button("Responder"):
             st.write("**Respuesta generada:**")
             st.write(answer)
 
+            # Mostrar fuentes relevantes únicas
             st.write("**Documentos relacionados:**")
             for i, (source, content) in enumerate(unique_sources.items()):
-                with st.expander(f"Fuente {i+1}: {source}"):
-                    st.write(content)
-
+                st.write(f"Fuente {i+1}: {source}")
+                st.write(content)
 
             # Guardar la respuesta y la pregunta en la sesión
             st.session_state["last_query"] = query
             st.session_state["response"] = answer
+
+            # Generar preguntas dinámicas basadas en resultados previos
+            def generate_dynamic_questions(sources):
+                dynamic_questions = []
+                for content in sources.values():
+                    # Extraer preguntas potenciales
+                    if "¿" in content:
+                        dynamic_questions.extend(
+                            [line.strip() for line in content.split("\n") if line.startswith("¿")]
+                        )
+                return dynamic_questions[:3]  # Limitar a 3 preguntas
+
+            if response and "source_documents" in response:
+                dynamic_questions = generate_dynamic_questions(unique_sources)
+                st.write("**Preguntas dinámicas sugeridas:**")
+                for dq in dynamic_questions:
+                    if st.button(dq):
+                        st.session_state.query = dq
+
         except Exception as e:
             st.error(f"Error: {e}")
     else:

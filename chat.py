@@ -12,6 +12,7 @@ from langchain_community.vectorstores.vectara import (
     SummaryConfig,
     VectaraQueryConfig,
 )
+from datetime import datetime
 
 # Inicialización del estado de la sesión
 if "query" not in st.session_state:
@@ -31,6 +32,31 @@ rerank_config = RerankConfig(reranker="mmr", rerank_k=50, mmr_diversity_bias=0.1
 config = VectaraQueryConfig(
     k=10, lambda_val=0.0, rerank_config=rerank_config, summary_config=summary_config
 )
+
+# Función para guardar en Vectara
+def save_to_vectara(query, response, satisfaction, document_id="2560b95df098dda376512766f44af3e0"):
+    """
+    Guarda la respuesta marcada como satisfactoria o no satisfactoria en Vectara.
+
+    Args:
+        query (str): La consulta realizada por el usuario.
+        response (str): La respuesta generada por el sistema.
+        satisfaction (str): Indica si la respuesta fue "Satisfactoria" o "No satisfactoria".
+        document_id (str): ID del documento en el corpus de Vectara para adjuntar respuestas.
+    """
+    try:
+        vectara.add_texts(
+            texts=[
+                f"Timestamp: {datetime.now().isoformat()}\n"
+                f"Query: {query}\n"
+                f"Response: {response}\n"
+                f"Satisfaction: {satisfaction}"
+            ],
+            document_id=document_id,  # Especificar el mismo ID de documento para adjuntar
+        )
+        st.success(f"¡Respuesta marcada como '{satisfaction}' y guardada en Vectara!")
+    except Exception as e:
+        st.error(f"Error al guardar la respuesta en Vectara: {e}")
 
 # Título
 st.markdown("### Prototipo de chat sobre las Devociones Marianas de Paucartambo")
@@ -63,6 +89,7 @@ query_str = st.text_input("Pregunta algo sobre Devociones Marianas o Danzas de P
 # Botón de respuesta
 if st.button("Responder"):
     if query_str.strip():
+        st.session_state.query = query_str
         rag = vectara.as_chat(config)
         response = rag.invoke(query_str)
         st.session_state.response = response.get("answer", "Lo siento, no tengo suficiente información para responder a tu pregunta.")
@@ -71,12 +98,15 @@ if st.button("Responder"):
 
 # Área de respuesta editable
 st.write("**Respuesta (editable):**")
-st.text_area("Edita la respuesta antes de guardar:", value=st.session_state.response)
+if st.session_state.response:
+    st.session_state.response = st.text_area("Edita la respuesta antes de guardar:", value=st.session_state.response, height=150)
 
 # Botones de retroalimentación
 st.write("**¿Esta respuesta fue satisfactoria?**")
 col1, col2 = st.columns(2)
 with col1:
-    st.button("👍 Sí")
+    if st.button("👍 Sí"):
+        save_to_vectara(st.session_state.query, st.session_state.response, "Satisfactoria")
 with col2:
-    st.button("👎 No")
+    if st.button("👎 No"):
+        save_to_vectara(st.session_state.query, st.session_state.response, "No satisfactoria")

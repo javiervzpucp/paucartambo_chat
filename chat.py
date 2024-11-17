@@ -23,7 +23,7 @@ if "query" not in st.session_state:
 if "response" not in st.session_state:
     st.session_state.response = ""
 
-# Function for translation
+# Translation function
 def translate_text(text, target_language):
     try:
         translator = Translator(to_lang=target_language)
@@ -39,20 +39,19 @@ language_map = {
 }
 
 # Sidebar for language selection
-st.sidebar.markdown("### Seleccione un idioma / Choose a language / Rimanapayay hina simi suyay")
+st.sidebar.title("Configuración")
 selected_language = st.sidebar.selectbox(
-    "Idioma / Language / Simi",
-    list(language_map.keys()),
-    index=list(language_map.keys()).index(st.session_state.language),
+    "Seleccione un idioma / Choose a language / Rimanapayay hina simi suyay",
+    list(language_map.keys())
 )
 
-# Update session state without rerun
+# Update session state language
 st.session_state.language = selected_language
+selected_language_code = language_map[selected_language]
 
-# Translation utility
+# Dynamic translation
 def dynamic_translation(text):
-    language_code = language_map[st.session_state.language]
-    return translate_text(text, language_code)
+    return translate_text(text, selected_language_code)
 
 # Vectara Configuration
 vectara = Vectara(
@@ -68,7 +67,7 @@ config = VectaraQueryConfig(
 )
 
 # Title
-st.markdown(dynamic_translation("### Prototipo de chat sobre las Devociones Marianas de Paucartambo"))
+st.markdown(f"### {dynamic_translation('Prototipo de chat sobre las Devociones Marianas de Paucartambo')}")
 
 # Display an image below the title
 st.image(
@@ -90,7 +89,7 @@ preguntas_sugeridas = [
 preguntas_sugeridas_translated = [dynamic_translation(p) for p in preguntas_sugeridas]
 
 # Show suggested questions as buttons
-st.write(dynamic_translation("**Preguntas sugeridas**"))
+st.write(f"**{dynamic_translation('Preguntas sugeridas')}**")
 selected_question = None
 for pregunta in preguntas_sugeridas_translated:
     if st.button(pregunta):
@@ -116,7 +115,7 @@ if st.button(dynamic_translation("Responder")):
         st.warning(dynamic_translation("Por favor, ingresa una pregunta válida."))
 
 # Editable response area
-st.write(dynamic_translation("**Respuesta (editable):**"))
+st.write(f"**{dynamic_translation('Respuesta (editable):')}**")
 if st.session_state.response:
     st.session_state.response = st.text_area(
         dynamic_translation("Edita la respuesta antes de guardar:"),
@@ -141,7 +140,7 @@ def save_to_vectara(query, response, satisfaction, document_id="2560b95df098dda3
         st.error(dynamic_translation(f"Error al guardar la respuesta en Vectara: {e}"))
 
 # Thumbs-up and Thumbs-down buttons for feedback
-st.write(dynamic_translation("**¿Esta respuesta fue satisfactoria?**"))
+st.write(f"**{dynamic_translation('¿Esta respuesta fue satisfactoria?')}**")
 col1, col2 = st.columns(2)
 
 with col1:

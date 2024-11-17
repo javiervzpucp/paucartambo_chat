@@ -6,136 +6,156 @@ Created on Thu Nov 14 11:08:21 2024
 """
 
 import streamlit as st
-from datetime import datetime
 from langchain_community.vectorstores import Vectara
 from langchain_community.vectorstores.vectara import (
     RerankConfig,
     SummaryConfig,
     VectaraQueryConfig,
 )
+import requests
+from langchain.document_loaders import TextLoader
+from langchain.chains.graph import GraphChain
+from langchain.graphs.networkx_graph import NetworkxEntityGraph
+import networkx as nx
+from datetime import datetime
+import pyvis.network as net
+from streamlit.components.v1 import html
 
 # Configuración de Vectara
-vectara = Vectara(
-    vectara_customer_id="2620549959",
-    vectara_corpus_id=2,
-    vectara_api_key="zwt_nDJrR3X2jvq60t7xt0kmBzDOEWxIGt8ZJqloiQ",
-)
+VECTARA_API_URL = "https://api.vectara.io/v2/query"
+VECTARA_API_KEY = "zwt_nDJrR3X2jvq60t7xt0kmBzDOEWxIGt8ZJqloiQ"
+VECTARA_CORPUS_ID = 2
+VECTARA_CUSTOMER_ID = "2620549959"
 
-summary_config = SummaryConfig(is_enabled=True, max_results=5, response_lang="spa")
-rerank_config = RerankConfig(reranker="mmr", rerank_k=50, mmr_diversity_bias=0.1)
-config = VectaraQueryConfig(
-    k=10, lambda_val=0.0, rerank_config=rerank_config, summary_config=summary_config
-)
-
-# Inicializar estado de sesión
+# Inicializar session state para persistir datos
 if "query" not in st.session_state:
     st.session_state.query = ""
 if "response" not in st.session_state:
     st.session_state.response = ""
-if "user_history" not in st.session_state:
-    st.session_state.user_history = []
-if "dynamic_questions" not in st.session_state:
-    st.session_state.dynamic_questions = []
+if "graph" not in st.session_state:
+    st.session_state.graph = None
 
-# Función para generar preguntas dinámicas
-def generar_preguntas_dinamicas(historial, n=3):
-    recomendaciones = []
-    if not historial:
-        # Generar preguntas iniciales si no hay historial
-        return [
-            "¿Qué danzas participan en la festividad?",
-            "¿Cuál es el significado de las vestimentas?",
-            "¿Cómo se originaron las devociones marianas?",
-        ]
-    for consulta in historial[-5:]:  # Tomar las últimas 5 consultas para contexto
-        response = vectara.as_chat(config).invoke(
-            f"Basándote en la pregunta '{consulta}', sugiere consultas relacionadas."
-        )
-        if response and "answer" in response:
-            preguntas = response["answer"].split("\n")
-            recomendaciones.extend(preguntas)
+# Función para obtener documentos desde Vectara
+def fetch_documents_from_vectara():
+    """
+    Llama a la API de Vectara para obtener documentos relevantes.
 
-    # Filtrar duplicados y devolver hasta N preguntas únicas
-    preguntas_unicas = list(set([p.strip() for p in recomendaciones if p.strip()]))
-    return preguntas_unicas[:n]
+    Returns:
+        list: Lista de documentos con texto.
+    """
+    headers = {
+        "Authorization": f"Bearer {VECTARA_API_KEY}",
+        "Content-Type": "application/json",
+    }
 
-# Mantener 3 preguntas dinámicas
-if len(st.session_state.dynamic_questions) < 3:
-    nuevas_preguntas = generar_preguntas_dinamicas(
-        st.session_state.user_history, 
-        n=3 - len(st.session_state.dynamic_questions)
-    )
-    st.session_state.dynamic_questions.extend(nuevas_preguntas)
+    payload = {
+        "query": {"query": "Devociones Marianas Paucartambo"},
+        "customer_id": VECTARA_CUSTOMER_ID,
+        "corpus_id": [VECTARA_CORPUS_ID],
+        "num_results": 5,
+    }
 
-# Título
-st.title("Prototipo de chat sobre las Devociones Marianas de Paucartambo")
+    response = requests.post(VECTARA_API_URL, headers=headers, json=payload)
 
-# Imagen
-st.image(
-    "https://raw.githubusercontent.com/javiervzpucp/paucartambo/main/imagenes/1.png",
-    caption="Virgen del Carmen de Paucartambo",
-    use_container_width=True,
-)
+    if response.status_code == 200:
+        results = response.json().get("results", [])
+        return [{"text": result["snippet"]} for result in results]
+    else:
+        raise Exception(f"Error fetching documents from Vectara: {response.text}")
 
-# Preguntas dinámicas
-st.write("**Preguntas sugeridas dinámicas:**")
-preguntas_a_mostrar = st.session_state.dynamic_questions[:3]  # Mostrar hasta 3 preguntas dinámicas
-for i, pregunta in enumerate(preguntas_a_mostrar):
-    if st.button(f"Pregunta {i+1}: {pregunta}"):
-        st.session_state.query = pregunta
-        st.session_state.user_history.append(pregunta)  # Agregar al historial
-        nuevas_preguntas = generar_preguntas_dinamicas([pregunta], n=1)  # Generar una nueva
-        st.session_state.dynamic_questions.remove(pregunta)  # Eliminar la seleccionada
-        st.session_state.dynamic_questions.extend(nuevas_preguntas)  # Añadir nuevas preguntas
-        break  # Salir tras procesar el clic
+# Función para construir un Knowledge Graph
+def build_knowledge_graph(documents):
+    """
+    Construye un Knowledge Graph usando LangChain y NetworkX.
 
-# Entrada para consultas personalizadas
-query_str = st.text_input(
-    "Pregunta algo sobre Devociones Marianas o Danzas de Paucartambo:",
-    value=st.session_state.query,
-)
+    Args:
+        documents (list): Lista de documentos con texto para procesar.
 
-# Botón para responder
-if st.button("Responder"):
-    if query_str.strip():
-        with st.spinner("Generando respuesta..."):
+    Returns:
+        NetworkxEntityGraph: Grafo con entidades y relaciones extraídas.
+    """
+    graph = NetworkxEntityGraph(graph=nx.MultiDiGraph())
+    processed_docs = [TextLoader(doc["text"]).load() for doc in documents]
+    graph_chain = GraphChain.from_documents(processed_docs, graph=graph)
+    graph_chain.run()
+    return graph
+
+# Visualización del Knowledge Graph
+def visualize_knowledge_graph(graph):
+    """
+    Genera una visualización del grafo usando Pyvis.
+
+    Args:
+        graph (NetworkxEntityGraph): Knowledge Graph.
+
+    Returns:
+        None
+    """
+    net_graph = net.Network(height="600px", width="100%", directed=True)
+    
+    # Añadir nodos y bordes desde NetworkX
+    for node in graph.graph.nodes:
+        net_graph.add_node(node, label=node)
+    for edge in graph.graph.edges(data=True):
+        net_graph.add_edge(edge[0], edge[1], title=edge[2].get("relation", ""))
+
+    # Guardar el grafo en HTML y renderizarlo en Streamlit
+    path = "/tmp/graph.html"
+    net_graph.show(path)
+    with open(path, "r", encoding="utf-8") as f:
+        html(f.read(), height=600)
+
+# Interfaz de usuario
+st.title("Devociones Marianas de Paucartambo")
+
+st.sidebar.title("Opciones")
+option = st.sidebar.radio("Seleccione una acción:", ["Consultar", "Ver Knowledge Graph"])
+
+if option == "Consultar":
+    # Preguntas sugeridas
+    preguntas_sugeridas = [
+        "¿Qué danzas se presentan en honor a la Mamacha Carmen?",
+        "¿Cuál es el origen de las devociones marianas en Paucartambo?",
+        "¿Qué papeles tienen los diferentes grupos de danza en la festividad?",
+        "¿Cómo se celebra la festividad de la Virgen del Carmen?",
+        "¿Cuál es el significado de las vestimentas en las danzas?",
+    ]
+
+    st.write("**Preguntas sugeridas**")
+    for pregunta in preguntas_sugeridas:
+        if st.button(pregunta):
+            st.session_state.query = pregunta
+
+    # Entrada personalizada
+    query_str = st.text_input("Pregunta algo sobre Devociones Marianas o Danzas de Paucartambo:", value=st.session_state.query)
+
+    if st.button("Responder"):
+        if query_str.strip():
             st.session_state.query = query_str
             rag = vectara.as_chat(config)
             response = rag.invoke(query_str)
-            st.session_state.response = response.get("answer", "Lo siento, no tengo suficiente información para responder a tu pregunta.")
-            st.session_state.user_history.append(query_str)  # Añadir consulta al historial
-    else:
-        st.warning("Por favor, ingresa una pregunta válida.")
+            st.session_state.response = response.get("answer", "No se encontró información relevante.")
+        else:
+            st.warning("Por favor, ingresa una pregunta válida.")
 
-# Mostrar respuesta
-st.write("**Respuesta:**")
-if st.session_state.response:
-    st.session_state.response = st.text_area(
-        "Edita la respuesta antes de guardar:",
-        value=st.session_state.response,
-        height=150,
-    )
+    # Mostrar respuesta
+    st.write("**Respuesta (editable):**")
+    st.session_state.response = st.text_area("Edita la respuesta antes de guardar:", value=st.session_state.response, height=150)
 
-# Guardar respuestas satisfactorias en Vectara
-def guardar_respuesta(query, response, satisfaction):
-    try:
-        vectara.add_texts(
-            texts=[
-                f"Timestamp: {datetime.now().isoformat()}\n"
-                f"Query: {query}\n"
-                f"Response: {response}\n"
-                f"Satisfaction: {satisfaction}"
-            ]
-        )
-        st.success(f"¡Respuesta marcada como '{satisfaction}' y guardada correctamente!")
-    except Exception as e:
-        st.error(f"Error al guardar la respuesta en Vectara: {e}")
+    # Botones de retroalimentación
+    st.write("**¿Esta respuesta fue satisfactoria?**")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("👍 Sí"):
+            st.success("Gracias por tu retroalimentación.")
+    with col2:
+        if st.button("👎 No"):
+            st.info("Gracias por ayudarnos a mejorar.")
 
-# Botones de retroalimentación
-col1, col2 = st.columns(2)
-with col1:
-    if st.button("👍 Sí"):
-        guardar_respuesta(st.session_state.query, st.session_state.response, "Satisfactoria")
-with col2:
-    if st.button("👎 No"):
-        guardar_respuesta(st.session_state.query, st.session_state.response, "No satisfactoria")
+elif option == "Ver Knowledge Graph":
+    st.write("**Knowledge Graph Generado**")
+    if not st.session_state.graph:
+        with st.spinner("Cargando documentos y construyendo el Knowledge Graph..."):
+            documents = fetch_documents_from_vectara()
+            st.session_state.graph = build_knowledge_graph(documents)
+    visualize_knowledge_graph(st.session_state.graph)

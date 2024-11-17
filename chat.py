@@ -68,11 +68,31 @@ def extract_context(query):
             context.append(f"{record['n']['content']} -[{record['r']['type']}]-> {record['m']['content']}")
     return "\n".join(context)
 
-# Crear grafo de conocimiento
-@st.cache_resource
+import requests
+
+def fetch_vectara_documents(query):
+    url = f"https://api.vectara.io/v1/query"  # Endpoint para consultas
+    headers = {
+        "Authorization": f"Bearer {vectara_api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "query": query,
+        "customerId": vectara_customer_id,
+        "corpusId": vectara_corpus_id,
+    }
+    
+    response = requests.post(url, json=payload, headers=headers)
+    
+    if response.status_code == 200:
+        return response.json()["results"]
+    else:
+        raise Exception(f"Error al consultar Vectara: {response.status_code} - {response.text}")
+
+
 def create_knowledge_graph():
-    vectara_docs = vectara.query(" ")
-    texts = [doc.get("text", "") for doc in vectara_docs["documents"] if doc.get("text")]
+    vectara_docs = fetch_vectara_documents(" ")
+    texts = [doc["content"] for doc in vectara_docs if "content" in doc]
     llm_transformer = LLMGraphTransformer(llm=client)
 
     with graph_driver.session() as session:
@@ -100,6 +120,7 @@ def create_knowledge_graph():
                         type=edge["type"]
                     )
     return "Grafo de conocimiento creado."
+
 
 # Inicializar Knowledge Graph
 knowledge_graph_status = create_knowledge_graph()

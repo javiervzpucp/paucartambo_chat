@@ -86,12 +86,16 @@ if st.button("Responder"):
     else:
         st.warning("Por favor, ingresa una pregunta válida.")
 
-# Display response
-st.write("**Respuesta:**")
-if "response" in st.session_state:
-    st.write(st.session_state.response)
-else:
-    st.info("No se ha generado una respuesta aún. Presiona 'Responder' para continuar.")
+# Editable response
+st.write("**Respuesta (editable):**")
+if "response" not in st.session_state:
+    st.session_state.response = ""
+
+st.session_state.response = st.text_area(
+    "Edita la respuesta si es necesario:",
+    value=st.session_state.response,
+    height=150
+)
 
 # Feedback buttons
 st.write("**¿Esta respuesta fue satisfactoria?**")

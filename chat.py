@@ -70,24 +70,56 @@ def extract_context(query):
 
 import requests
 
+import requests
+
 def fetch_vectara_documents(query):
-    url = f"https://api.vectara.io/v1/query"  # Endpoint para consultas
+    """
+    Realiza una consulta a la API de Vectara para obtener documentos relacionados con la consulta proporcionada.
+
+    Args:
+        query (str): La consulta de búsqueda.
+
+    Returns:
+        list: Una lista de resultados de documentos si la consulta es exitosa.
+
+    Raises:
+        Exception: Si ocurre algún error al consultar la API de Vectara.
+    """
+    # Endpoint de la API
+    url = "https://api.vectara.io/v1/query"
+    
+    # Cabeceras de autenticación y tipo de contenido
     headers = {
         "Authorization": f"Bearer {vectara_api_key}",
         "Content-Type": "application/json",
     }
+    
+    # Validar que la consulta no esté vacía
+    if not query or query.strip() == "":
+        query = "fetch all documents"  # Usar un valor predeterminado si la consulta está vacía
+
+    # Crear el payload de la solicitud
     payload = {
         "query": query,
         "customerId": vectara_customer_id,
         "corpusId": vectara_corpus_id,
     }
     
-    response = requests.post(url, json=payload, headers=headers)
-    
-    if response.status_code == 200:
-        return response.json()["results"]
-    else:
-        raise Exception(f"Error al consultar Vectara: {response.status_code} - {response.text}")
+    try:
+        # Realizar la solicitud POST a la API
+        response = requests.post(url, json=payload, headers=headers)
+        
+        # Manejar la respuesta
+        if response.status_code == 200:
+            # Devolver los resultados de la consulta
+            return response.json().get("results", [])
+        else:
+            # Lanzar una excepción con detalles del error
+            raise Exception(f"Error al consultar Vectara: {response.status_code} - {response.text}")
+    except requests.exceptions.RequestException as e:
+        # Manejar errores relacionados con la red o solicitudes
+        raise Exception(f"Error de red al consultar Vectara: {str(e)}")
+
 
 
 def create_knowledge_graph():

@@ -6,71 +6,48 @@ Created on Thu Nov 14 11:08:21 2024
 
 import streamlit as st
 from langchain_community.vectorstores import Vectara
-from datetime import datetime
+from langchain.chains import RetrievalQA
+from langchain.chat_models import ChatOpenAI
 from dotenv import load_dotenv
+from datetime import datetime
 import os
 
 # Cargar las variables de entorno desde el archivo .env
 load_dotenv()
 
 # Configuración de credenciales
-vectara_customer_id = 2620549959
+openai_api_key = st.secrets['openai']["OPENAI_API_KEY"]
+vectara_customer_id = "2620549959"
 vectara_corpus_id = 2
 vectara_api_key = "zwt_nDJrR3X2jvq60t7xt0kmBzDOEWxIGt8ZJqloiQ"
 
 # Validar que todas las variables se hayan cargado correctamente
+if not openai_api_key:
+    raise ValueError("Falta la API Key de OpenAI. Configúrala en el archivo .env")
 if not vectara_customer_id or not vectara_corpus_id or not vectara_api_key:
     raise ValueError("Falta información de Vectara. Configúrala en el archivo .env")
 
-# Configuración de Vectara
+# Configuración de Vectara como VectorStore
 vectara = Vectara(
-    vectara_customer_id=str(vectara_customer_id),
+    vectara_customer_id=vectara_customer_id,
     vectara_corpus_id=vectara_corpus_id,
     vectara_api_key=vectara_api_key,
 )
 
-# Función para realizar consultas a Vectara
-def fetch_vectara_documents(query):
-    """
-    Realiza una consulta a la API de Vectara para obtener documentos relacionados.
-    """
-    try:
-        response = vectara.query(query)
-        results = response.get("documents", [])
-        if results:
-            return results  # Lista de documentos relacionados
-        else:
-            return []
-    except Exception as e:
-        raise Exception(f"Error al consultar Vectara: {e}")
+# Inicializar modelo LLM
+llm = ChatOpenAI(
+    model_name="gpt-4-turbo",
+    temperature=0,
+    openai_api_key=openai_api_key,
+)
 
-# Función para mostrar los resultados obtenidos de Vectara
-def format_vectara_response(documents):
-    """
-    Formatea los documentos obtenidos de Vectara en un texto amigable.
-    """
-    formatted_response = []
-    for i, doc in enumerate(documents):
-        text = doc.get("text", "Sin texto disponible")
-        source = doc.get("source", "Fuente desconocida")
-        score = doc.get("score", "Sin puntuación")
-        formatted_response.append(f"Resultado {i+1}:\nTexto: {text}\nFuente: {source}\nPuntuación: {score}\n")
-    return "\n".join(formatted_response)
-
-# Función para guardar respuestas útiles en Vectara
-def save_to_vectara(query, response):
-    """
-    Guarda la consulta y respuesta útil en un documento de Vectara.
-    """
-    try:
-        timestamp = datetime.now().isoformat()
-        vectara.add_texts(
-            texts=[f"Timestamp: {timestamp}\nQuery: {query}\nResponse: {response}"],
-            document_id="useful_responses"  # ID del documento donde se guardarán las respuestas útiles
-        )
-        st.success("¡Respuesta marcada como útil y guardada en Vectara!")
-    except Exception as e:
-        st.error(f"Error al guardar la respuesta en Vectara: {e}")
+# Configuración de RAG con LangChain
+retriever = vectara.as_retriever(search_kwargs={"k": 5})
+qa_chain = RetrievalQA.from_chain_type(
+    llm=llm,
+    retriever=retriever,
+    return_source_documents=True
+)
 
 # Interfaz de Streamlit
 st.title("Prototipo de Chat sobre Devociones Marianas de Paucartambo")
@@ -92,27 +69,34 @@ preguntas_sugeridas = [
 ]
 
 st.write("**Preguntas sugeridas**")
-for pregunta in preguntas_sugeridas:
-    if st.button(pregunta):
-        st.session_state.query = pregunta
+selected_question = st.radio("Elige una pregunta:", preguntas_sugeridas)
 
-# Entrada del usuario
-query = st.text_input("Haz una pregunta relacionada con las Devociones Marianas de Paucartambo:", value=st.session_state.get("query", ""))
+# Entrada personalizada
+query = st.text_input(
+    "O pregunta algo relacionado con las Devociones Marianas de Paucartambo:",
+    value=selected_question if selected_question else ""
+)
 
 # Botón para obtener respuestas
 if st.button("Responder"):
     if query.strip():
         try:
-            # Consultar documentos relevantes en Vectara
-            documents = fetch_vectara_documents(query)
-            if documents:
-                # Formatear y mostrar los resultados
-                formatted_response = format_vectara_response(documents)
-                st.write("**Resultados obtenidos de Vectara:**")
-                st.text(formatted_response)
-                st.session_state["response"] = formatted_response
-            else:
-                st.warning("No se encontraron documentos relevantes en Vectara.")
+            # Consultar el sistema RAG
+            response = qa_chain({"query": query})
+            answer = response["result"]
+            source_docs = response["source_documents"]
+
+            st.write("**Respuesta generada:**")
+            st.write(answer)
+
+            # Mostrar fuentes relevantes
+            st.write("**Documentos relacionados:**")
+            for i, doc in enumerate(source_docs):
+                st.write(f"Fuente {i+1}: {doc.metadata.get('source', 'Fuente desconocida')}")
+                st.write(doc.page_content[:300] + "...")  # Mostrar un extracto de cada documento
+
+            # Guardar la respuesta en la sesión
+            st.session_state["response"] = answer
         except Exception as e:
             st.error(f"Error: {e}")
     else:
@@ -121,11 +105,25 @@ if st.button("Responder"):
 # Mostrar respuesta generada si existe
 if "response" in st.session_state:
     st.write("**Respuesta generada:**")
-    st.text(st.session_state["response"])
+    st.write(st.session_state["response"])
 
 # Retroalimentación del usuario
 st.write("**¿Esta respuesta fue útil?**")
 col1, col2 = st.columns(2)
+
+def save_to_vectara(query, response):
+    """
+    Guarda la consulta y respuesta útil en un documento de Vectara.
+    """
+    try:
+        vectara.add_texts(
+            texts=[
+                f"Query: {query}\nResponse: {response}",
+            ]
+        )
+        st.success("¡Respuesta marcada como útil y guardada en Vectara!")
+    except Exception as e:
+        st.error(f"Error al guardar la respuesta en Vectara: {e}")
 
 with col1:
     if st.button("👍 Sí"):

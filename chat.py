@@ -15,26 +15,38 @@ from langchain_community.vectorstores.vectara import (
 from datetime import datetime
 from translate import Translator
 
-# Initialize translation function
+# Initialize session state for language
+if "language" not in st.session_state:
+    st.session_state.language = "Español"
+
+# Function for translation
 def translate_text(text, target_language):
     translator = Translator(to_lang=target_language)
     return translator.translate(text)
 
-# Language selection at the beginning
-st.markdown("### Seleccione un idioma / Choose a language / Rimanapayay hina simi suyay")
-language = st.selectbox("Idioma / Language / Simi", ["Español", "English", "Quechua"], index=0)
-
-# Map the language choice to a language code for the Translator library
+# Language mapping
 language_map = {
     "Español": "es",
     "English": "en",
     "Quechua": "qu",
 }
-selected_language_code = language_map[language]
 
-# Translation function for dynamic text
+# Language selection
+st.sidebar.markdown("### Seleccione un idioma / Choose a language / Rimanapayay hina simi suyay")
+selected_language = st.sidebar.selectbox(
+    "Idioma / Language / Simi",
+    list(language_map.keys()),
+    index=list(language_map.keys()).index(st.session_state.language),
+)
+
+# Update session state when language changes
+if selected_language != st.session_state.language:
+    st.session_state.language = selected_language
+
+# Translation utility
 def dynamic_translation(text):
-    return translate_text(text, selected_language_code)
+    language_code = language_map[st.session_state.language]
+    return translate_text(text, language_code)
 
 # Vectara Configuration
 vectara = Vectara(

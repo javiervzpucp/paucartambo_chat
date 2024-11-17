@@ -62,7 +62,6 @@ def extract_context(query):
             context.append(f"{record['n']['content']} -[{record['r']['type']}]-> {record['m']['content']}")
     return "\n".join(context)
 
-# Función para procesar archivos PDF y TXT desde la carpeta "documentos"
 def create_knowledge_graph():
     """
     Crea un grafo de conocimiento procesando documentos PDF y TXT en la carpeta 'documentos'.
@@ -83,7 +82,7 @@ def create_knowledge_graph():
                     pdf_text += page.extract_text()
                 texts.append(pdf_text)
             elif filename.endswith(".txt"):
-                with open(file_path, "r", encoding='latin-1') as txt_file:
+                with open(file_path, "r", encoding="utf-8") as txt_file:
                     texts.append(txt_file.read())
         except Exception as e:
             st.error(f"Error al leer el archivo {filename}: {e}")
@@ -102,8 +101,8 @@ def create_knowledge_graph():
                         """
                         MERGE (n:Node {id: $id, content: $content})
                         """,
-                        id=node.get("id"),
-                        content=node.get("type")
+                        id=node["id"],  # Cambiado de node.get("id")
+                        content=node["type"]  # Cambiado de node.get("type")
                     )
                 for edge in graph_doc.relationships:
                     session.run(
@@ -111,11 +110,12 @@ def create_knowledge_graph():
                         MATCH (a:Node {id: $source}), (b:Node {id: $target})
                         MERGE (a)-[r:RELATION {type: $type}]->(b)
                         """,
-                        source=edge["source"]["id"],
-                        target=edge["target"]["id"],
-                        type=edge["type"]
+                        source=edge["source"]["id"],  # Cambiado de edge["source"].get("id")
+                        target=edge["target"]["id"],  # Cambiado de edge["target"].get("id")
+                        type=edge["type"]  # Cambiado de edge.get("type")
                     )
     return "Grafo de conocimiento creado desde archivos PDF y TXT."
+
 
 # Inicializar Knowledge Graph
 try:

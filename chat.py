@@ -21,8 +21,11 @@ if "language" not in st.session_state:
 
 # Function for translation
 def translate_text(text, target_language):
-    translator = Translator(to_lang=target_language)
-    return translator.translate(text)
+    try:
+        translator = Translator(to_lang=target_language)
+        return translator.translate(text)
+    except Exception:
+        return text  # Return the original text if translation fails
 
 # Language mapping
 language_map = {
@@ -39,9 +42,10 @@ selected_language = st.sidebar.selectbox(
     index=list(language_map.keys()).index(st.session_state.language),
 )
 
-# Update session state when language changes
+# Update session state and re-run the script when the language changes
 if selected_language != st.session_state.language:
     st.session_state.language = selected_language
+    st.experimental_rerun()
 
 # Translation utility
 def dynamic_translation(text):

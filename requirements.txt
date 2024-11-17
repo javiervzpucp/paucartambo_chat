@@ -6,10 +6,8 @@ annotated-types==0.7.0
 anyio==4.6.2.post1
 attrs==24.2.0
 blinker==1.9.0
-Brotli @ file:///C:/b/abs_3d36mno480/croot/brotli-split_1714483178642/work
+Brotli==1.1.0
 cachetools==5.5.0
-certifi @ file:///home/conda/feedstock_root/build_artifacts/certifi_1725278078093/work/certifi
-cffi @ file:///C:/b/abs_90yq4lmu83/croot/cffi_1726856448345/work
 chardet==3.0.4
 charset-normalizer @ file:///home/conda/feedstock_root/build_artifacts/charset-normalizer_1728479282467/work
 click==8.1.7

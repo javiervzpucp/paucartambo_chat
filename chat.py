@@ -40,6 +40,13 @@ if "dynamic_questions" not in st.session_state:
 # Función para generar preguntas dinámicas
 def generar_preguntas_dinamicas(historial, n=3):
     recomendaciones = []
+    if not historial:
+        # Generar preguntas iniciales si no hay historial
+        return [
+            "¿Qué danzas participan en la festividad?",
+            "¿Cuál es el significado de las vestimentas?",
+            "¿Cómo se originaron las devociones marianas?",
+        ]
     for consulta in historial[-5:]:  # Tomar las últimas 5 consultas para contexto
         response = vectara.as_chat(config).invoke(
             f"Basándote en la pregunta '{consulta}', sugiere consultas relacionadas."
@@ -72,9 +79,9 @@ st.image(
 
 # Preguntas dinámicas
 st.write("**Preguntas sugeridas dinámicas:**")
-nuevas_preguntas = []
-for pregunta in st.session_state.dynamic_questions[:3]:  # Mostrar las primeras 3 preguntas dinámicas
-    if st.button(pregunta):
+preguntas_a_mostrar = st.session_state.dynamic_questions[:3]  # Mostrar hasta 3 preguntas dinámicas
+for i, pregunta in enumerate(preguntas_a_mostrar):
+    if st.button(f"Pregunta {i+1}: {pregunta}"):
         st.session_state.query = pregunta
         st.session_state.user_history.append(pregunta)  # Agregar al historial
         nuevas_preguntas = generar_preguntas_dinamicas([pregunta], n=1)  # Generar una nueva

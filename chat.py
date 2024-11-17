@@ -90,16 +90,23 @@ if st.button("Responder"):
             # Consultar el sistema RAG
             response = qa_chain({"query": query})
             answer = response["result"]
+
+            # Filtrar documentos únicos por su metadato 'source'
             source_docs = response["source_documents"]
+            unique_sources = {}
+            for doc in source_docs:
+                source = doc.metadata.get("source", "Fuente desconocida")
+                if source not in unique_sources:
+                    unique_sources[source] = doc.page_content[:300] + "..."
 
             st.write("**Respuesta generada:**")
             st.write(answer)
 
-            # Mostrar fuentes relevantes
+            # Mostrar fuentes relevantes únicas
             st.write("**Documentos relacionados:**")
-            for i, doc in enumerate(source_docs):
-                st.write(f"Fuente {i+1}: {doc.metadata.get('source', 'Fuente desconocida')}")
-                st.write(doc.page_content[:300] + "...")  # Mostrar un extracto de cada documento
+            for i, (source, content) in enumerate(unique_sources.items()):
+                st.write(f"Fuente {i+1}: {source}")
+                st.write(content)
 
             # Guardar la respuesta en la sesión
             st.session_state["response"] = answer

@@ -75,4 +75,4 @@ tzdata==2024.2
 urllib3==2.2.3
 watchdog==6.0.0
 wheel==0.44.0
-yarl==1.17.1
+yarl==1.17.

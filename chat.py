@@ -16,10 +16,10 @@ import os
 # Cargar las variables de entorno desde el archivo .env
 load_dotenv()
 
-# Configuración de credenciales
-vectara_customer_id = 2620549959
-vectara_corpus_id = 2
-vectara_api_key = os.getenv("VECTARA_API_KEY")
+# Leer credenciales de Vectara
+vectara_customer_id = st.secrets["vectara"]["CUSTOMER_ID"]
+vectara_corpus_id = st.secrets["vectara"]["CORPUS_ID"]
+vectara_api_key = st.secrets["vectara"]["API_KEY"]
 
 # Configuración de Vectara
 vectara = Vectara(

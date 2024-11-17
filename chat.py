@@ -20,9 +20,22 @@ def translate_text(text, target_language):
     translator = Translator(to_lang=target_language)
     return translator.translate(text)
 
+# Initialize session state for language
+if "language" not in st.session_state:
+    st.session_state.language = "Español"  # Default language is Spanish
+
 # Language selection at the beginning
 st.markdown("### Seleccione un idioma / Choose a language / Rimanapayay hina simi suyay")
-language = st.selectbox("Idioma / Language / Simi", ["Español", "English", "Quechua"])
+language = st.selectbox(
+    "Idioma / Language / Simi",
+    ["Español", "English", "Quechua"],
+    index=["Español", "English", "Quechua"].index(st.session_state.language),
+)
+
+# Update session state language
+if language != st.session_state.language:
+    st.session_state.language = language
+    st.experimental_rerun()  # Rerun the app to apply the language change
 
 # Map the language choice to a language code for the Translator library
 language_map = {
@@ -30,7 +43,7 @@ language_map = {
     "English": "en",
     "Quechua": "qu",
 }
-selected_language_code = language_map[language]
+selected_language_code = language_map[st.session_state.language]
 
 # Vectara Configuration
 vectara = Vectara(

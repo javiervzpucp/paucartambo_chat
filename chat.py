@@ -7,7 +7,6 @@ import streamlit as st
 from langchain_community.vectorstores import Vectara
 from langchain.prompts import PromptTemplate
 from langchain.chat_models import ChatOpenAI
-from langchain.graphs import KnowledgeGraph
 from langchain_experimental.graph_transformers import LLMGraphTransformer
 from langchain_core.documents import Document
 from dotenv import load_dotenv
@@ -39,7 +38,7 @@ llm = ChatOpenAI(
     openai_api_key=openai_api_key
 )
 
-# Configuración de Neo4j para grafo
+# Configuración de Neo4j para el grafo
 driver = GraphDatabase.driver(neo4j_uri, auth=(neo4j_user, neo4j_pass))
 
 # Borrar grafo previo en Neo4j
@@ -67,8 +66,26 @@ def create_knowledge_graph():
             graph_documents = llm_transformer.convert_to_graph_documents([document])
             
             # Insertar en Neo4j
-            neo4j_graph = KnowledgeGraph(driver=driver)
-            neo4j_graph.add_graph_documents(graph_documents)
+            with driver.session() as session:
+                for doc in graph_documents:
+                    for node in doc.nodes:
+                        session.write_transaction(
+                            lambda tx: tx.run(
+                                "CREATE (n:Entity {id: $id, type: $type})",
+                                id=node["id"],
+                                type=node["type"],
+                            )
+                        )
+                    for edge in doc.relationships:
+                        session.write_transaction(
+                            lambda tx: tx.run(
+                                "MATCH (a:Entity {id: $source_id}), (b:Entity {id: $target_id}) "
+                                "CREATE (a)-[:RELATION {type: $type}]->(b)",
+                                source_id=edge["source"]["id"],
+                                target_id=edge["target"]["id"],
+                                type=edge["type"],
+                            )
+                        )
             
             # Construir NetworkX grafo
             for doc in graph_documents:

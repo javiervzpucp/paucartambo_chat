@@ -83,7 +83,7 @@ def create_knowledge_graph():
                     pdf_text += page.extract_text()
                 texts.append(pdf_text)
             elif filename.endswith(".txt"):
-                with open(file_path, "r", encoding="utf-8") as txt_file:
+                with open(file_path, "r", encoding='latin-1') as txt_file:
                     texts.append(txt_file.read())
         except Exception as e:
             st.error(f"Error al leer el archivo {filename}: {e}")

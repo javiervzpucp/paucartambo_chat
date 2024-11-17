@@ -73,10 +73,33 @@ def save_to_vectara(query, response):
         st.error(f"Error al guardar la respuesta en Vectara: {e}")
 
 # Interfaz de Streamlit
-st.title("Prototipo de Respuestas desde Vectara")
+st.title("Prototipo de Chat sobre Devociones Marianas de Paucartambo")
 
-query = st.text_input("Haz una pregunta relacionada con las Devociones Marianas de Paucartambo:")
+# Mostrar imagen principal
+st.image(
+    "https://raw.githubusercontent.com/javiervzpucp/paucartambo/main/imagenes/1.png",
+    caption="Virgen del Carmen de Paucartambo",
+    use_container_width=True,
+)
 
+# Preguntas sugeridas
+preguntas_sugeridas = [
+    "¿Qué danzas se presentan en honor a la Mamacha Carmen?",
+    "¿Cuál es el origen de las devociones marianas en Paucartambo?",
+    "¿Qué papeles tienen los diferentes grupos de danza en la festividad?",
+    "¿Cómo se celebra la festividad de la Virgen del Carmen?",
+    "¿Cuál es el significado de las vestimentas en las danzas?",
+]
+
+st.write("**Preguntas sugeridas**")
+for pregunta in preguntas_sugeridas:
+    if st.button(pregunta):
+        st.session_state.query = pregunta
+
+# Entrada del usuario
+query = st.text_input("Haz una pregunta relacionada con las Devociones Marianas de Paucartambo:", value=st.session_state.get("query", ""))
+
+# Botón para obtener respuestas
 if st.button("Responder"):
     if query.strip():
         try:
@@ -87,12 +110,18 @@ if st.button("Responder"):
                 formatted_response = format_vectara_response(documents)
                 st.write("**Resultados obtenidos de Vectara:**")
                 st.text(formatted_response)
+                st.session_state["response"] = formatted_response
             else:
                 st.warning("No se encontraron documentos relevantes en Vectara.")
         except Exception as e:
             st.error(f"Error: {e}")
     else:
         st.warning("Por favor, ingresa una pregunta válida.")
+
+# Mostrar respuesta generada si existe
+if "response" in st.session_state:
+    st.write("**Respuesta generada:**")
+    st.text(st.session_state["response"])
 
 # Retroalimentación del usuario
 st.write("**¿Esta respuesta fue útil?**")
@@ -101,7 +130,7 @@ col1, col2 = st.columns(2)
 with col1:
     if st.button("👍 Sí"):
         try:
-            save_to_vectara(query, formatted_response)
+            save_to_vectara(query, st.session_state["response"])
         except Exception as e:
             st.error(f"Error: {e}")
 

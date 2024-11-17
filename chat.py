@@ -70,15 +70,17 @@ preguntas_sugeridas = [
 
 # Botones para preguntas sugeridas
 st.write("**Preguntas sugeridas:**")
+if "query" not in st.session_state:
+    st.session_state.query = ""
+
 for pregunta in preguntas_sugeridas:
     if st.button(pregunta):
-        query = pregunta  # Asignar directamente al query
-        break  # Terminar el loop al seleccionar una pregunta
+        st.session_state.query = pregunta  # Asignar directamente al estado de la sesión
 
 # Entrada personalizada
 query = st.text_input(
     "O pregunta algo relacionado con las Devociones Marianas de Paucartambo:",
-    value=query if "query" in locals() else ""
+    value=st.session_state.query,
 )
 
 # Botón para obtener respuestas
@@ -108,7 +110,7 @@ if st.button("Responder"):
 
 # Mostrar respuesta generada si existe
 if "response" in st.session_state:
-    st.write("**Respuesta generada:**")
+    st.write("**Última respuesta generada:**")
     st.write(st.session_state["response"])
 
 # Retroalimentación del usuario

@@ -62,28 +62,31 @@ def extract_context(query):
             context.append(f"{record['n']['content']} -[{record['r']['type']}]-> {record['m']['content']}")
     return "\n".join(context)
 
-# Función para procesar archivos PDF desde la carpeta "documentos"
+# Función para procesar archivos PDF y TXT desde la carpeta "documentos"
 def create_knowledge_graph():
     """
-    Crea un grafo de conocimiento procesando documentos PDF en la carpeta 'documentos'.
+    Crea un grafo de conocimiento procesando documentos PDF y TXT en la carpeta 'documentos'.
     """
-    folder_path = "documentos"  # Carpeta donde están los PDFs
+    folder_path = "documentos"  # Carpeta donde están los PDFs y TXT
     if not os.path.exists(folder_path):
         raise FileNotFoundError(f"La carpeta '{folder_path}' no existe.")
 
     texts = []
-    # Leer y procesar los PDFs
+    # Leer y procesar los PDFs y TXT
     for filename in os.listdir(folder_path):
-        if filename.endswith(".pdf"):
-            file_path = os.path.join(folder_path, filename)
-            try:
+        file_path = os.path.join(folder_path, filename)
+        try:
+            if filename.endswith(".pdf"):
                 pdf_reader = PdfReader(file_path)
                 pdf_text = ""
                 for page in pdf_reader.pages:
                     pdf_text += page.extract_text()
                 texts.append(pdf_text)
-            except Exception as e:
-                st.error(f"Error al leer el archivo {filename}: {e}")
+            elif filename.endswith(".txt"):
+                with open(file_path, "r", encoding="utf-8") as txt_file:
+                    texts.append(txt_file.read())
+        except Exception as e:
+            st.error(f"Error al leer el archivo {filename}: {e}")
 
     # Generar grafo a partir de los textos extraídos
     llm_transformer = LLMGraphTransformer(llm=client)
@@ -112,7 +115,7 @@ def create_knowledge_graph():
                         target=edge["target"]["id"],
                         type=edge["type"]
                     )
-    return "Grafo de conocimiento creado desde archivos PDF."
+    return "Grafo de conocimiento creado desde archivos PDF y TXT."
 
 # Inicializar Knowledge Graph
 try:

@@ -18,6 +18,10 @@ from translate import Translator
 # Initialize session state for language
 if "language" not in st.session_state:
     st.session_state.language = "Español"
+if "query" not in st.session_state:
+    st.session_state.query = ""
+if "response" not in st.session_state:
+    st.session_state.response = ""
 
 # Function for translation
 def translate_text(text, target_language):
@@ -34,7 +38,7 @@ language_map = {
     "Quechua": "qu",
 }
 
-# Language selection
+# Sidebar for language selection
 st.sidebar.markdown("### Seleccione un idioma / Choose a language / Rimanapayay hina simi suyay")
 selected_language = st.sidebar.selectbox(
     "Idioma / Language / Simi",
@@ -42,10 +46,8 @@ selected_language = st.sidebar.selectbox(
     index=list(language_map.keys()).index(st.session_state.language),
 )
 
-# Update session state and re-run the script when the language changes
-if selected_language != st.session_state.language:
-    st.session_state.language = selected_language
-    st.experimental_rerun()
+# Update session state without rerun
+st.session_state.language = selected_language
 
 # Translation utility
 def dynamic_translation(text):
@@ -64,12 +66,6 @@ rerank_config = RerankConfig(reranker="mmr", rerank_k=50, mmr_diversity_bias=0.1
 config = VectaraQueryConfig(
     k=10, lambda_val=0.0, rerank_config=rerank_config, summary_config=summary_config
 )
-
-# Initialize session state for query and response persistence
-if "query" not in st.session_state:
-    st.session_state.query = ""
-if "response" not in st.session_state:
-    st.session_state.response = ""
 
 # Title
 st.markdown(dynamic_translation("### Prototipo de chat sobre las Devociones Marianas de Paucartambo"))

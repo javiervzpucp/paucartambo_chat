@@ -6,10 +6,8 @@ Created on Thu Nov 14 11:08:21 2024
 
 import streamlit as st
 from langchain_community.vectorstores import Vectara
-from langchain.chains.graph import GraphChain
-from langchain.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
+from langchain.chat_models import ChatOpenAI
 from langchain.graphs import KnowledgeGraph
 from dotenv import load_dotenv
 import os
@@ -33,7 +31,7 @@ llm = ChatOpenAI(
     openai_api_key=openai_api_key
 )
 
-# Crear el grafo de conocimiento
+# Crear el grafo de conocimiento una sola vez
 @st.cache_resource
 def create_knowledge_graph():
     # Extraer documentos desde Vectara
@@ -44,35 +42,34 @@ def create_knowledge_graph():
     knowledge_graph = KnowledgeGraph()
     for text in texts:
         knowledge_graph.add_text(text, llm)
-
+    
     return knowledge_graph
-
-# Crear una función para construir el grafo de conocimiento
-@st.cache_resource
-def initialize_graph_chain():
-    knowledge_graph = create_knowledge_graph()
-    graph_prompt = PromptTemplate(
-        input_variables=["query", "knowledge_str"],
-        template="Contesta la siguiente pregunta usando el conocimiento disponible.\nPregunta: {query}\nConocimiento: {knowledge_str}",
-    )
-    return GraphChain(
-        llm=llm,
-        prompt=graph_prompt,
-        graph=knowledge_graph
-    )
 
 # Configurar Streamlit
 st.title("Prototipo de Chat con Grafo de Conocimiento")
 
-# Inicializar la cadena del grafo
-graph_chain = initialize_graph_chain()
+# Inicializar el grafo de conocimiento
+knowledge_graph = create_knowledge_graph()
+
+# Prompt Template
+graph_prompt = PromptTemplate(
+    input_variables=["query", "knowledge_str"],
+    template="Responde la siguiente pregunta usando este conocimiento: \nPregunta: {query}\nConocimiento: {knowledge_str}",
+)
 
 # Entrada del usuario
 query = st.text_input("Haz una pregunta relacionada con las Devociones Marianas de Paucartambo:")
 
 if st.button("Responder"):
     if query:
-        response = graph_chain.run(query=query)
+        # Extraer el conocimiento relevante del grafo
+        knowledge_str = knowledge_graph.get_knowledge_str()
+        
+        # Formatear el prompt con el conocimiento y la consulta
+        prompt_text = graph_prompt.format(query=query, knowledge_str=knowledge_str)
+        
+        # Obtener la respuesta del modelo
+        response = llm.predict(prompt_text)
         st.write("**Respuesta:**", response)
     else:
         st.warning("Por favor, ingresa una pregunta válida.")

@@ -12,7 +12,12 @@ from langchain_community.vectorstores.vectara import (
     SummaryConfig,
     VectaraQueryConfig,
 )
-from datetime import datetime
+
+# Inicialización del estado de la sesión
+if "query" not in st.session_state:
+    st.session_state.query = ""
+if "response" not in st.session_state:
+    st.session_state.response = ""
 
 # Configuración de Vectara
 vectara = Vectara(
@@ -71,7 +76,6 @@ st.text_area("Edita la respuesta antes de guardar:", value=st.session_state.resp
 # Botones de retroalimentación
 st.write("**¿Esta respuesta fue satisfactoria?**")
 col1, col2 = st.columns(2)
-
 with col1:
     st.button("👍 Sí")
 with col2:

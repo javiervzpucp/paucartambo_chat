@@ -6,216 +6,105 @@ Created on Thu Nov 14 11:08:21 2024
 
 import streamlit as st
 from langchain_community.vectorstores import Vectara
-from langchain.chat_models import ChatOpenAI
-from langchain_experimental.graph_transformers import LLMGraphTransformer
-from langchain_core.documents import Document
-from neo4j import GraphDatabase
-from dotenv import load_dotenv
 from datetime import datetime
+from dotenv import load_dotenv
 import os
-from PyPDF2 import PdfReader
 
 # Cargar las variables de entorno desde el archivo .env
 load_dotenv()
 
 # Configuración de credenciales
-openai_api_key = st.secrets['openai']["OPENAI_API_KEY"]
 vectara_customer_id = 2620549959
 vectara_corpus_id = 2
 vectara_api_key = "zwt_nDJrR3X2jvq60t7xt0kmBzDOEWxIGt8ZJqloiQ"
-neo4j_url = "neo4j+s://8c9ab5cb.databases.neo4j.io"
-neo4j_user = "neo4j"
-neo4j_pass = "EsxnRgeaaaGcqKSslig3di1IAl5l51yIj39lj7wWhyQ"
 
 # Validar que todas las variables se hayan cargado correctamente
-if not openai_api_key:
-    raise ValueError("Falta la API Key de OpenAI. Configúrala en el archivo .env")
 if not vectara_customer_id or not vectara_corpus_id or not vectara_api_key:
     raise ValueError("Falta información de Vectara. Configúrala en el archivo .env")
 
-# Inicializar cliente de OpenAI
-client = ChatOpenAI(
-    model_name="gpt-4-turbo",
-    temperature=0,
-    openai_api_key=openai_api_key
+# Configuración de Vectara
+vectara = Vectara(
+    vectara_customer_id=str(vectara_customer_id),
+    vectara_corpus_id=vectara_corpus_id,
+    vectara_api_key=vectara_api_key,
 )
 
-# Configuración de Neo4j
-graph_driver = GraphDatabase.driver(neo4j_url, auth=(neo4j_user, neo4j_pass))
-
-# Función para extraer contexto del Knowledge Graph
-def extract_context(query):
+# Función para realizar consultas a Vectara
+def fetch_vectara_documents(query):
     """
-    Extrae nodos y relaciones relevantes del grafo basados en la consulta del usuario.
-    """
-    context = []
-    with graph_driver.session() as session:
-        results = session.run(
-            """
-            MATCH (n)-[r]->(m)
-            WHERE n.content CONTAINS $query OR m.content CONTAINS $query
-            RETURN n, r, m
-            """,
-            query=query
-        )
-        for record in results:
-            context.append(f"{record['n']['content']} -[{record['r']['type']}]-> {record['m']['content']}")
-    return "\n".join(context)
-
-def create_knowledge_graph():
-    """
-    Crea un grafo de conocimiento procesando documentos PDF y TXT en la carpeta 'documentos'.
-    """
-    folder_path = "documentos"  # Carpeta donde están los PDFs y TXT
-    if not os.path.exists(folder_path):
-        raise FileNotFoundError(f"La carpeta '{folder_path}' no existe.")
-
-    texts = []
-    # Leer y procesar los PDFs y TXT
-    for filename in os.listdir(folder_path):
-        file_path = os.path.join(folder_path, filename)
-        try:
-            if filename.endswith(".pdf"):
-                pdf_reader = PdfReader(file_path)
-                pdf_text = ""
-                for page in pdf_reader.pages:
-                    pdf_text += page.extract_text()
-                texts.append(pdf_text)
-            elif filename.endswith(".txt"):
-                with open(file_path, "r", encoding="utf-8") as txt_file:
-                    texts.append(txt_file.read())
-        except Exception as e:
-            st.error(f"Error al leer el archivo {filename}: {e}")
-
-    # Generar grafo a partir de los textos extraídos
-    llm_transformer = LLMGraphTransformer(llm=client)
-
-    with graph_driver.session() as session:
-        for text in texts:
-            document = Document(page_content=text)
-            graph_documents = llm_transformer.convert_to_graph_documents([document])
-
-            for graph_doc in graph_documents:
-                for node in graph_doc.nodes:
-                    session.run(
-                        """
-                        MERGE (n:Node {id: $id, content: $content})
-                        """,
-                        id=node["id"],  # Cambiado de node.get("id")
-                        content=node["type"]  # Cambiado de node.get("type")
-                    )
-                for edge in graph_doc.relationships:
-                    session.run(
-                        """
-                        MATCH (a:Node {id: $source}), (b:Node {id: $target})
-                        MERGE (a)-[r:RELATION {type: $type}]->(b)
-                        """,
-                        source=edge["source"]["id"],  # Cambiado de edge["source"].get("id")
-                        target=edge["target"]["id"],  # Cambiado de edge["target"].get("id")
-                        type=edge["type"]  # Cambiado de edge.get("type")
-                    )
-    return "Grafo de conocimiento creado desde archivos PDF y TXT."
-
-
-# Inicializar Knowledge Graph
-try:
-    knowledge_graph_status = create_knowledge_graph()
-    st.success(knowledge_graph_status)
-except Exception as e:
-    st.error(f"Error al crear el grafo de conocimiento: {e}")
-
-# Función para generar respuestas utilizando contexto del Knowledge Graph
-def generate_response_from_knowledge_graph(query, context):
-    """
-    Genera una respuesta basada en el contexto extraído del Knowledge Graph.
-    """
-    prompt = f"""
-    Eres un experto en cultura peruana y tienes conocimiento detallado sobre las Devociones Marianas de Paucartambo.
-    Usa el siguiente contexto para responder a la pregunta del usuario:
-    
-    Contexto:
-    {context}
-    
-    Pregunta:
-    {query}
+    Realiza una consulta a la API de Vectara para obtener documentos relacionados.
     """
     try:
-        response = client.chat.completions.create(
-            model="gpt-4-turbo",
-            messages=[
-                {"role": "system", "content": "Eres un asistente experto en cultura peruana."},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=300,
-            temperature=0.5
-        )
-        return response.choices[0].message.content.strip()
+        response = vectara.query(query)
+        results = response.get("documents", [])
+        if results:
+            return results  # Lista de documentos relacionados
+        else:
+            return []
     except Exception as e:
-        st.error(f"Error al interactuar con GPT-4: {e}")
-        return "Lo siento, hubo un error al generar la respuesta."
+        raise Exception(f"Error al consultar Vectara: {e}")
 
-# Función para guardar respuestas satisfactorias en Vectara
-def save_to_vectara(query, response, satisfaction, document_id="2560b95df098dda376512766f44af3e0"):
+# Función para mostrar los resultados obtenidos de Vectara
+def format_vectara_response(documents):
+    """
+    Formatea los documentos obtenidos de Vectara en un texto amigable.
+    """
+    formatted_response = []
+    for i, doc in enumerate(documents):
+        text = doc.get("text", "Sin texto disponible")
+        source = doc.get("source", "Fuente desconocida")
+        score = doc.get("score", "Sin puntuación")
+        formatted_response.append(f"Resultado {i+1}:\nTexto: {text}\nFuente: {source}\nPuntuación: {score}\n")
+    return "\n".join(formatted_response)
+
+# Función para guardar respuestas útiles en Vectara
+def save_to_vectara(query, response):
+    """
+    Guarda la consulta y respuesta útil en un documento de Vectara.
+    """
     try:
+        timestamp = datetime.now().isoformat()
         vectara.add_texts(
-            texts=[
-                f"Timestamp: {datetime.now().isoformat()}\n"
-                f"Query: {query}\n"
-                f"Response: {response}\n"
-                f"Satisfaction: {satisfaction}"
-            ],
-            document_id=document_id
+            texts=[f"Timestamp: {timestamp}\nQuery: {query}\nResponse: {response}"],
+            document_id="useful_responses"  # ID del documento donde se guardarán las respuestas útiles
         )
-        st.success(f"¡Respuesta marcada como '{satisfaction}' y guardada en Vectara!")
+        st.success("¡Respuesta marcada como útil y guardada en Vectara!")
     except Exception as e:
         st.error(f"Error al guardar la respuesta en Vectara: {e}")
 
-# Función para mostrar preguntas recomendadas
-def display_recommended_questions(questions):
-    """
-    Muestra preguntas recomendadas como botones en Streamlit.
-    """
-    st.write("**Preguntas recomendadas:**")
-    for question in questions:
-        if st.button(question):
-            return question
-    return None
-
 # Interfaz de Streamlit
-st.title("Prototipo de Chat con Grafo de Conocimiento")
+st.title("Prototipo de Respuestas desde Vectara")
 
-# Preguntas recomendadas
-recommended_questions = [
-    "¿Cuál es el origen de las Devociones Marianas?",
-    "¿Qué significa la Virgen del Carmen en Paucartambo?",
-    "¿Cómo se celebra la fiesta de la Virgen del Rosario?",
-]
-
-selected_question = display_recommended_questions(recommended_questions)
-
-# Entrada del usuario o pregunta seleccionada
-query = st.text_input("Haz una pregunta relacionada con las Devociones Marianas de Paucartambo:", value=selected_question or "")
+query = st.text_input("Haz una pregunta relacionada con las Devociones Marianas de Paucartambo:")
 
 if st.button("Responder"):
     if query.strip():
-        context = extract_context(query)
-        if context:
-            response = generate_response_from_knowledge_graph(query, context)
-            st.write("**Respuesta generada:**")
-            st.write(response)
-        else:
-            st.warning("No se encontró contexto relevante en el grafo.")
+        try:
+            # Consultar documentos relevantes en Vectara
+            documents = fetch_vectara_documents(query)
+            if documents:
+                # Formatear y mostrar los resultados
+                formatted_response = format_vectara_response(documents)
+                st.write("**Resultados obtenidos de Vectara:**")
+                st.text(formatted_response)
+            else:
+                st.warning("No se encontraron documentos relevantes en Vectara.")
+        except Exception as e:
+            st.error(f"Error: {e}")
     else:
         st.warning("Por favor, ingresa una pregunta válida.")
 
 # Retroalimentación del usuario
-st.write("**¿Esta respuesta fue satisfactoria?**")
+st.write("**¿Esta respuesta fue útil?**")
 col1, col2 = st.columns(2)
 
 with col1:
     if st.button("👍 Sí"):
-        save_to_vectara(query, response, "Satisfactoria")
+        try:
+            save_to_vectara(query, formatted_response)
+        except Exception as e:
+            st.error(f"Error: {e}")
 
 with col2:
     if st.button("👎 No"):
-        save_to_vectara(query, response, "No satisfactoria")
+        st.warning("Gracias por tu retroalimentación. Trabajaremos para mejorar.")

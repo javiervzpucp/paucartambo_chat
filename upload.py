@@ -1,44 +1,43 @@
 import requests
-import json
 
-# Updated API key with correct permissions
-api_key = "zwt_nDJrRwRHtr31pOA0qHxov2hKV61hdrbFupsptQ"
+# Vectara API Configuration
+API_URL = "https://api.vectara.io/v1/query"
+API_KEY = "zwt_nDJrR3X2jvq60t7xt0kmBzDOEWxIGt8ZJqloiQ"
+CUSTOMER_ID = "2620549959"
+CORPUS_ID = 2  # Your Corpus ID
+DOCUMENT_ID = "Mascara_Tranformacion_e_Identidad_en_los.pdf"  # Document ID
 
-# API endpoint
-url = "https://api.vectara.io/v2/corpora/paucartambo/documents"
+# Headers for API Authentication
+headers = {
+    "Accept": "application/json",
+    "x-api-key": API_KEY,
+}
 
-# Payload
+# Payload to Query for the Document
 payload = {
-    "id": "my-doc-id",  # Unique document ID
-    "type": "core",  # Document type
-    "metadata": {
-        "title": "A Nice Document",
-        "lang": "eng"
-    },
-    "document_parts": [
+    "query": [
         {
-            "text": "I'm a nice document part.",
-            "metadata": {
-                "nice_rank": 9000
-            }
+            "query": f"id:{DOCUMENT_ID}",
+            "num_results": 1,
+            "corpus_key": [
+                {"customer_id": CUSTOMER_ID, "corpus_id": CORPUS_ID}
+            ]
         }
     ]
 }
 
-# Headers
-headers = {
-    "Content-Type": "application/json",
-    "Accept": "application/json",
-    "x-api-key": api_key
-}
+# Make API Request
+response = requests.post(API_URL, json=payload, headers=headers)
 
-# POST request
-response = requests.post(url, headers=headers, data=json.dumps(payload))
-
-# Response handling
+# Handle Response
 if response.status_code == 200:
-    print("Document successfully uploaded:", response.json())
+    result = response.json()
+    if "results" in result and result["results"]:
+        document = result["results"][0]
+        print("Document retrieved successfully:")
+        print(document)
+    else:
+        print("No document found with the specified ID.")
 else:
-    print(f"Error: {response.status_code}, {response.text}")
-
-
+    print(f"Error fetching document. Status code: {response.status_code}")
+    print(f"Response: {response.text}")

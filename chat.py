@@ -1,21 +1,29 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Nov 14 11:08:21 2024
-@author: jveraz
+Prototipo de chat con grafo de conocimiento
 """
 
 import streamlit as st
 from langchain_community.vectorstores import Vectara
 from langchain.prompts import PromptTemplate
 from langchain.chat_models import ChatOpenAI
+from langchain.graphs import KnowledgeGraph
+from langchain_experimental.graph_transformers import LLMGraphTransformer
+from langchain_core.documents import Document
 from dotenv import load_dotenv
 import os
 from datetime import datetime
+from neo4j import GraphDatabase
 import networkx as nx
+import matplotlib.pyplot as plt
+import json
 
-# Cargar las variables de entorno desde el archivo .env
+# Cargar variables de entorno desde .env
 load_dotenv()
 openai_api_key = os.getenv("OPENAI_API_KEY")
+neo4j_uri = os.getenv("NEO4J_URI")
+neo4j_user = os.getenv("NEO4J_USERNAME")
+neo4j_pass = os.getenv("NEO4J_PASSWORD")
 
 # Configuración de Vectara
 vectara = Vectara(
@@ -31,57 +39,78 @@ llm = ChatOpenAI(
     openai_api_key=openai_api_key
 )
 
-# Crear el grafo manualmente
-@st.cache_resource
-def create_manual_knowledge_graph():
-    G = nx.DiGraph()
+# Configuración de Neo4j para grafo
+driver = GraphDatabase.driver(neo4j_uri, auth=(neo4j_user, neo4j_pass))
 
-    # Extraer documentos desde Vectara
+# Borrar grafo previo en Neo4j
+def clear_graph(tx):
+    tx.run("MATCH (n) DETACH DELETE n")
+
+with driver.session() as session:
+    session.write_transaction(clear_graph)
+
+# Crear un grafo de conocimiento desde Vectara
+@st.cache_resource
+def create_knowledge_graph():
     vectara_docs = vectara.query(" ")
     texts = [doc["text"] for doc in vectara_docs["documents"]]
-
-    # Construir nodos y relaciones del grafo
+    nx_graph = nx.Graph()
+    
     for text in texts:
-        # Extraer relaciones del texto (simulado para este ejemplo)
-        # En producción, usar una función para extraer relaciones.
-        G.add_node(text[:50], content=text)  # Usar una parte del texto como identificador
-    return G
+        # Procesar texto en fragmentos
+        chunk_size = 10000
+        text_chunks = [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
+        
+        for chunk in text_chunks:
+            document = Document(page_content=chunk)
+            llm_transformer = LLMGraphTransformer(llm=llm)
+            graph_documents = llm_transformer.convert_to_graph_documents([document])
+            
+            # Insertar en Neo4j
+            neo4j_graph = KnowledgeGraph(driver=driver)
+            neo4j_graph.add_graph_documents(graph_documents)
+            
+            # Construir NetworkX grafo
+            for doc in graph_documents:
+                for node in doc.nodes:
+                    nx_graph.add_node(node["id"], content=node["type"])
+                for edge in doc.relationships:
+                    source = edge["source"]["id"]
+                    target = edge["target"]["id"]
+                    nx_graph.add_edge(source, target, relationship=edge["type"])
+    
+    # Guardar grafo como JSON y PNG
+    nx_data = nx.node_link_data(nx_graph)
+    with open("saved_graph.json", "w") as f:
+        json.dump(nx_data, f)
+    plt.figure(figsize=(10, 10))
+    pos = nx.spring_layout(nx_graph)
+    nx.draw(nx_graph, pos, with_labels=True, node_size=500, node_color="gold", edge_color="black", font_size=8)
+    plt.savefig("graph.png")
+    return nx_graph
 
-# Configurar Streamlit
-st.title("Prototipo de Chat con Grafo de Conocimiento Manual")
+# Inicializar grafo
+knowledge_graph = create_knowledge_graph()
 
-# Inicializar el grafo de conocimiento
-knowledge_graph = create_manual_knowledge_graph()
+# Interfaz de usuario con Streamlit
+st.title("Prototipo de Chat con Grafo de Conocimiento")
 
-# Mostrar nodos del grafo
-if st.checkbox("Mostrar nodos del grafo"):
-    st.write("Nodos del grafo:")
-    st.write(list(knowledge_graph.nodes))
-
-# Prompt Template
-graph_prompt = PromptTemplate(
-    input_variables=["query", "knowledge_str"],
-    template="Responde la siguiente pregunta usando este conocimiento: \nPregunta: {query}\nConocimiento: {knowledge_str}",
-)
-
-# Entrada del usuario
 query = st.text_input("Haz una pregunta relacionada con las Devociones Marianas de Paucartambo:")
 
 if st.button("Responder"):
     if query:
-        # Obtener conocimiento del grafo
-        knowledge_str = ". ".join([data["content"] for _, data in knowledge_graph.nodes(data=True)])
+        # Extraer conocimiento del grafo
+        subgraph = nx.ego_graph(knowledge_graph, query, radius=1)  # Cambia `radius` para mayor contexto
+        knowledge_str = "\n".join([f"{node}: {data['content']}" for node, data in subgraph.nodes(data=True)])
         
-        # Formatear el prompt con el conocimiento y la consulta
-        prompt_text = graph_prompt.format(query=query, knowledge_str=knowledge_str)
-        
-        # Obtener la respuesta del modelo
-        response = llm.predict(prompt_text)
+        # Generar respuesta usando el conocimiento
+        prompt = f"Usa el siguiente conocimiento para responder:\n{knowledge_str}\nPregunta: {query}"
+        response = llm.predict(prompt)
         st.write("**Respuesta:**", response)
     else:
         st.warning("Por favor, ingresa una pregunta válida.")
 
-# Función para guardar respuestas satisfactorias en Vectara
+# Guardar respuesta en Vectara
 def save_to_vectara(query, response, satisfaction, document_id="2560b95df098dda376512766f44af3e0"):
     try:
         vectara.add_texts(
@@ -91,20 +120,17 @@ def save_to_vectara(query, response, satisfaction, document_id="2560b95df098dda3
                 f"Response: {response}\n"
                 f"Satisfaction: {satisfaction}"
             ],
-            document_id=document_id,  # Guardar en el mismo documento
+            document_id=document_id
         )
         st.success(f"¡Respuesta marcada como '{satisfaction}' y guardada en Vectara!")
     except Exception as e:
         st.error(f"Error al guardar la respuesta en Vectara: {e}")
 
-# Retroalimentación del usuario
-st.write("**¿Esta respuesta fue satisfactoria?**")
+# Feedback del usuario
 col1, col2 = st.columns(2)
-
 with col1:
-    if st.button("👍 Sí"):
+    if st.button("👍 Satisfactoria"):
         save_to_vectara(query, response, "Satisfactoria")
-
 with col2:
-    if st.button("👎 No"):
+    if st.button("👎 No satisfactoria"):
         save_to_vectara(query, response, "No satisfactoria")

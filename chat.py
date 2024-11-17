@@ -11,13 +11,17 @@ from datetime import datetime
 import os
 from langchain_openai import ChatOpenAI
 from neo4j import GraphDatabase
-
+import openai
 # Cargar las variables de entorno desde el archivo .env
 load_dotenv()
 openai_api_key = os.getenv("OPENAI_API_KEY")
 neo4j_url = os.getenv("NEO4J_URI")
 neo4j_user = os.getenv("NEO4J_USERNAME")
 neo4j_pass = os.getenv("NEO4J_PASSWORD")
+
+
+# Configurar el cliente de OpenAI
+openai.api_key = openai_api_key
 
 # Inicializar cliente de OpenAI
 client = ChatOpenAI(

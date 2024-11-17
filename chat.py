@@ -8,10 +8,10 @@ import streamlit as st
 from langchain_community.vectorstores import Vectara
 from langchain.prompts import PromptTemplate
 from langchain.chat_models import ChatOpenAI
-from langchain.graphs import KnowledgeGraph
 from dotenv import load_dotenv
 import os
 from datetime import datetime
+import networkx as nx
 
 # Cargar las variables de entorno desde el archivo .env
 load_dotenv()
@@ -31,25 +31,32 @@ llm = ChatOpenAI(
     openai_api_key=openai_api_key
 )
 
-# Crear el grafo de conocimiento una sola vez
+# Crear el grafo manualmente
 @st.cache_resource
-def create_knowledge_graph():
+def create_manual_knowledge_graph():
+    G = nx.DiGraph()
+
     # Extraer documentos desde Vectara
     vectara_docs = vectara.query(" ")
     texts = [doc["text"] for doc in vectara_docs["documents"]]
 
-    # Crear un grafo de conocimiento a partir de los textos
-    knowledge_graph = KnowledgeGraph()
+    # Construir nodos y relaciones del grafo
     for text in texts:
-        knowledge_graph.add_text(text, llm)
-    
-    return knowledge_graph
+        # Extraer relaciones del texto (simulado para este ejemplo)
+        # En producción, usar una función para extraer relaciones.
+        G.add_node(text[:50], content=text)  # Usar una parte del texto como identificador
+    return G
 
 # Configurar Streamlit
-st.title("Prototipo de Chat con Grafo de Conocimiento")
+st.title("Prototipo de Chat con Grafo de Conocimiento Manual")
 
 # Inicializar el grafo de conocimiento
-knowledge_graph = create_knowledge_graph()
+knowledge_graph = create_manual_knowledge_graph()
+
+# Mostrar nodos del grafo
+if st.checkbox("Mostrar nodos del grafo"):
+    st.write("Nodos del grafo:")
+    st.write(list(knowledge_graph.nodes))
 
 # Prompt Template
 graph_prompt = PromptTemplate(
@@ -62,8 +69,8 @@ query = st.text_input("Haz una pregunta relacionada con las Devociones Marianas 
 
 if st.button("Responder"):
     if query:
-        # Extraer el conocimiento relevante del grafo
-        knowledge_str = knowledge_graph.get_knowledge_str()
+        # Obtener conocimiento del grafo
+        knowledge_str = ". ".join([data["content"] for _, data in knowledge_graph.nodes(data=True)])
         
         # Formatear el prompt con el conocimiento y la consulta
         prompt_text = graph_prompt.format(query=query, knowledge_str=knowledge_str)

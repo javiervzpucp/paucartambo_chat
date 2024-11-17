@@ -10,6 +10,7 @@ from langchain.chains import RetrievalQA
 from langchain.chat_models import ChatOpenAI
 from dotenv import load_dotenv
 from datetime import datetime
+from docx import Document  # Para crear documentos de Word
 import os
 
 # Cargar las variables de entorno desde el archivo .env
@@ -102,34 +103,14 @@ if st.button("Responder"):
             st.write("**Respuesta generada:**")
             st.write(answer)
 
-            # Mostrar fuentes relevantes únicas
             st.write("**Documentos relacionados:**")
             for i, (source, content) in enumerate(unique_sources.items()):
-                st.write(f"Fuente {i+1}: {source}")
-                st.write(content)
+                with st.expander(f"Fuente {i+1}: {source}"):
+                    st.write(content)
 
             # Guardar la respuesta y la pregunta en la sesión
             st.session_state["last_query"] = query
             st.session_state["response"] = answer
-
-            # Generar preguntas dinámicas basadas en resultados previos
-            def generate_dynamic_questions(sources):
-                dynamic_questions = []
-                for content in sources.values():
-                    # Extraer preguntas potenciales
-                    if "¿" in content:
-                        dynamic_questions.extend(
-                            [line.strip() for line in content.split("\n") if line.startswith("¿")]
-                        )
-                return dynamic_questions[:3]  # Limitar a 3 preguntas
-
-            if response and "source_documents" in response:
-                dynamic_questions = generate_dynamic_questions(unique_sources)
-                st.write("**Preguntas dinámicas sugeridas:**")
-                for dq in dynamic_questions:
-                    if st.button(dq):
-                        st.session_state.query = dq
-
         except Exception as e:
             st.error(f"Error: {e}")
     else:
@@ -140,6 +121,28 @@ if "response" in st.session_state and "last_query" in st.session_state:
     st.write("**Última pregunta y respuesta generada:**")
     st.write(f"**Pregunta:** {st.session_state['last_query']}")
     st.write(f"**Respuesta:** {st.session_state['response']}")
+
+    # Exportar respuesta a un archivo Word
+    def export_to_word(question, response):
+        doc = Document()
+        doc.add_heading("Respuesta Generada", level=1)
+        doc.add_paragraph(f"Pregunta: {question}")
+        doc.add_paragraph(f"Respuesta: {response}")
+        file_path = "respuesta_generada.docx"
+        doc.save(file_path)
+        return file_path
+
+    if st.button("Exportar respuesta a Word"):
+        file_path = export_to_word(
+            st.session_state["last_query"], st.session_state["response"]
+        )
+        with open(file_path, "rb") as file:
+            st.download_button(
+                label="Descargar Respuesta",
+                data=file,
+                file_name="respuesta_generada.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
 
 # Retroalimentación del usuario
 st.write("**¿Esta respuesta fue útil?**")

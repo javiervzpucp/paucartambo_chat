@@ -27,36 +27,31 @@ config = VectaraQueryConfig(
     k=10, lambda_val=0.0, rerank_config=rerank_config, summary_config=summary_config
 )
 
-# Inicializar el historial de consultas del usuario
+# Inicializar el historial y preguntas dinámicas
 if "user_history" not in st.session_state:
     st.session_state.user_history = []
+if "dynamic_questions" not in st.session_state:
+    st.session_state.dynamic_questions = []
 
-# Función para generar preguntas sugeridas dinámicas
-def generar_preguntas_sugeridas(historial):
-    if not historial:
-        # Preguntas predeterminadas si no hay historial
-        return [
-            "¿Qué danzas se presentan en honor a la Mamacha Carmen?",
-            "¿Cuál es el origen de las devociones marianas en Paucartambo?",
-            "¿Qué papeles tienen los diferentes grupos de danza en la festividad?",
-            "¿Cómo se celebra la festividad de la Virgen del Carmen?",
-            "¿Cuál es el significado de las vestimentas en las danzas?",
-        ]
-    
-    # Generar recomendaciones basadas en el historial
+# Función para generar preguntas dinámicas basadas en el historial
+def generar_preguntas_dinamicas(historial, n=3):
+    """Genera preguntas dinámicas en base al historial del usuario."""
     recomendaciones = []
     for consulta in historial:
         response = vectara.as_chat(config).invoke(
-            f"Basándote en la pregunta '{consulta}', sugiere una consulta relacionada."
+            f"Basándote en la pregunta '{consulta}', sugiere consultas relacionadas."
         )
         preguntas = response.get("answer", "").split("\n")
         recomendaciones.extend(preguntas)
 
-    # Filtrar duplicados y devolver las preguntas sugeridas
-    return list(set(recomendaciones))[:5]
+    # Filtrar duplicados, evitar preguntas vacías y devolver N preguntas
+    preguntas_unicas = list(set([p for p in recomendaciones if p.strip()]))
+    return preguntas_unicas[:n]
 
-# Generar preguntas sugeridas dinámicamente
-preguntas_sugeridas = generar_preguntas_sugeridas(st.session_state.user_history)
+# Actualizar preguntas dinámicas si no hay suficientes
+if len(st.session_state.dynamic_questions) < 3:
+    nuevas_preguntas = generar_preguntas_dinamicas(st.session_state.user_history, n=3 - len(st.session_state.dynamic_questions))
+    st.session_state.dynamic_questions.extend(nuevas_preguntas)
 
 # Título de la aplicación
 st.title("Prototipo de chat sobre las Devociones Marianas de Paucartambo")
@@ -68,13 +63,19 @@ st.image(
     use_container_width=True,
 )
 
-# Mostrar preguntas sugeridas
+# Preguntas dinámicas
 st.write("**Preguntas sugeridas dinámicas:**")
-for pregunta in preguntas_sugeridas:
+nuevas_preguntas = []
+for pregunta in st.session_state.dynamic_questions:
     if st.button(pregunta):
         st.session_state.query = pregunta
+        st.session_state.user_history.append(pregunta)  # Añadir al historial
+        nuevas_preguntas = generar_preguntas_dinamicas([pregunta], n=1)  # Generar una nueva pregunta para reemplazarla
+        st.session_state.dynamic_questions.remove(pregunta)
+        st.session_state.dynamic_questions.extend(nuevas_preguntas)
+        break  # Salir del loop tras procesar el clic
 
-# Entrada personalizada
+# Input para preguntas personalizadas
 query_str = st.text_input(
     "Pregunta algo sobre Devociones Marianas o Danzas de Paucartambo:",
     value=st.session_state.query if "query" in st.session_state else "",
@@ -103,7 +104,6 @@ if "response" in st.session_state:
 
 # Guardar respuesta marcada como satisfactoria
 def guardar_respuesta(query, response, satisfaction):
-    # Aquí podrías integrarlo con tu sistema actual de almacenamiento (como Vectara)
     st.success(f"¡Respuesta marcada como '{satisfaction}' y guardada correctamente!")
 
 # Botones de retroalimentación

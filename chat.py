@@ -6,38 +6,31 @@ Created on Thu Nov 14 11:08:21 2024
 
 import streamlit as st
 from langchain_community.vectorstores import Vectara
+from langchain.chat_models import ChatOpenAI
+from langchain_experimental.graph_transformers import LLMGraphTransformer
+from langchain_core.documents import Document
+from neo4j import GraphDatabase
 from dotenv import load_dotenv
 from datetime import datetime
 import os
-#from langchain_openai import ChatOpenAI
-from langchain.chat_models import ChatOpenAI
 
-from neo4j import GraphDatabase
-#import openai
 # Cargar las variables de entorno desde el archivo .env
 load_dotenv()
 
-# Variables de entorno
-openai_api_key = st.secrets['openai']["OPENAI_API_KEY"]#os.getenv("OPENAI_API_KEY")
+# Configuración de credenciales
+openai_api_key = st.secrets['openai']["OPENAI_API_KEY"]
 vectara_customer_id = 2620549959
 vectara_corpus_id = 2
 vectara_api_key = "zwt_nDJrR3X2jvq60t7xt0kmBzDOEWxIGt8ZJqloiQ"
+neo4j_url = "neo4j+s://8c9ab5cb.databases.neo4j.io"
+neo4j_user = "neo4j"
+neo4j_pass = "EsxnRgeaaaGcqKSslig3di1IAl5l51yIj39lj7wWhyQ"
 
 # Validar que todas las variables se hayan cargado correctamente
 if not openai_api_key:
     raise ValueError("Falta la API Key de OpenAI. Configúrala en el archivo .env")
 if not vectara_customer_id or not vectara_corpus_id or not vectara_api_key:
     raise ValueError("Falta información de Vectara. Configúrala en el archivo .env")
-
-neo4j_url="neo4j+s://8c9ab5cb.databases.neo4j.io"
-neo4j_user="neo4j"
-neo4j_pass="EsxnRgeaaaGcqKSslig3di1IAl5l51yIj39lj7wWhyQ"
-
-
-
-## Configurar el cliente de OpenAI
-#openai_api_key = st.secrets["OPENAI_API_KEY"]
-#openai.api_key = openai_api_key
 
 # Inicializar cliente de OpenAI
 client = ChatOpenAI(
@@ -66,28 +59,46 @@ def extract_context(query):
         results = session.run(
             """
             MATCH (n)-[r]->(m)
-            WHERE n.name CONTAINS $query OR m.name CONTAINS $query
+            WHERE n.content CONTAINS $query OR m.content CONTAINS $query
             RETURN n, r, m
             """,
             query=query
         )
         for record in results:
-            context.append(f"{record['n']['name']} -[{record['r']['type']}]-> {record['m']['name']}")
+            context.append(f"{record['n']['content']} -[{record['r']['type']}]-> {record['m']['content']}")
     return "\n".join(context)
 
-# Crear grafo de conocimiento (correr una vez)
+# Crear grafo de conocimiento
 @st.cache_resource
 def create_knowledge_graph():
     vectara_docs = vectara.query(" ")
-    texts = [doc["text"] for doc in vectara_docs["documents"]]
+    texts = [doc.get("text", "") for doc in vectara_docs["documents"] if doc.get("text")]
+    llm_transformer = LLMGraphTransformer(llm=client)
+
     with graph_driver.session() as session:
         for text in texts:
-            session.run(
-                """
-                CREATE (n:Document {content: $text})
-                """,
-                text=text
-            )
+            document = Document(page_content=text)
+            graph_documents = llm_transformer.convert_to_graph_documents([document])
+
+            for graph_doc in graph_documents:
+                for node in graph_doc.nodes:
+                    session.run(
+                        """
+                        MERGE (n:Node {id: $id, content: $content})
+                        """,
+                        id=node.get("id"),
+                        content=node.get("type")
+                    )
+                for edge in graph_doc.relationships:
+                    session.run(
+                        """
+                        MATCH (a:Node {id: $source}), (b:Node {id: $target})
+                        MERGE (a)-[r:RELATION {type: $type}]->(b)
+                        """,
+                        source=edge["source"]["id"],
+                        target=edge["target"]["id"],
+                        type=edge["type"]
+                    )
     return "Grafo de conocimiento creado."
 
 # Inicializar Knowledge Graph

@@ -13,27 +13,16 @@ from langchain_community.vectorstores.vectara import (
     SummaryConfig,
     VectaraQueryConfig,
 )
-from googletrans import Translator
 import pdfkit
-
-# Initialize the translator
-translator = Translator()
-
-# Language mapping
-language_codes = {
-    "Español": "es",
-    "Inglés": "en",
-    "Quechua": "qu",
-}
 
 # Vectara Configuration
 vectara = Vectara(
     vectara_customer_id="2620549959",
     vectara_corpus_id=2,
-    vectara_api_key="YOUR_VECTARA_API_KEY",  # Replace with your Vectara API key
+    vectara_api_key="zwt_nDJrR3X2jvq60t7xt0kmBzDOEWxIGt8ZJqloiQ",
 )
 
-summary_config = SummaryConfig(is_enabled=True, max_results=5, response_lang="es")
+summary_config = SummaryConfig(is_enabled=True, max_results=5, response_lang="spa")
 rerank_config = RerankConfig(reranker="mmr", rerank_k=50, mmr_diversity_bias=0.1)
 config = VectaraQueryConfig(
     k=10, lambda_val=0.0, rerank_config=rerank_config, summary_config=summary_config
@@ -44,15 +33,6 @@ if "query" not in st.session_state:
     st.session_state.query = ""
 if "response" not in st.session_state:
     st.session_state.response = ""
-if "points" not in st.session_state:
-    st.session_state.points = 0
-
-# Function to translate text based on selected language
-def translate_text(text, dest_language):
-    if dest_language == "es":
-        return text
-    else:
-        return translator.translate(text, src="es", dest=dest_language).text
 
 # Store satisfactory responses in Vectara under a single document
 def save_to_vectara(query, response, satisfaction, document_id="2560b95df098dda376512766f44af3e0"):
@@ -73,28 +53,19 @@ def save_to_vectara(query, response, satisfaction, document_id="2560b95df098dda3
                 f"Response: {response}\n"
                 f"Satisfaction: {satisfaction}"
             ],
-            document_id=document_id  # Specify the same document ID for appending
+            document_id=document_id
         )
-        st.success(translate_text(f"¡Respuesta marcada como '{satisfaction}' y guardada en Vectara bajo el documento '{document_id}'!", selected_language_code))
+        st.success(f"¡Respuesta marcada como '{satisfaction}' y guardada en Vectara bajo el documento '{document_id}'!")
     except Exception as e:
-        st.error(translate_text(f"Error al guardar la respuesta en Vectara: {e}", selected_language_code))
-
-# Language selection
-st.write("**Selecciona el idioma**")
-language = st.selectbox("Elige el idioma:", ["Español", "Inglés", "Quechua"])
-selected_language_code = language_codes[language]
-
-# Function to translate UI text
-def t(text):
-    return translate_text(text, selected_language_code)
+        st.error(f"Error al guardar la respuesta en Vectara: {e}")
 
 # Title
-st.markdown(f"<h1 style='font-size: 36px;'>{t('Prototipo de chat sobre las Devociones Marianas de Paucartambo')}</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='font-size: 36px;'>Prototipo de chat sobre las Devociones Marianas de Paucartambo</h1>", unsafe_allow_html=True)
 
 # Display an image below the title
 st.image(
     "https://raw.githubusercontent.com/javiervzpucp/paucartambo/main/imagenes/1.png",
-    caption=t("Virgen del Carmen de Paucartambo"),
+    caption="Virgen del Carmen de Paucartambo",
     use_container_width=True,
 )
 
@@ -107,77 +78,53 @@ preguntas_sugeridas = [
     "¿Cuál es el significado de las vestimentas en las danzas?",
 ]
 
-# Translate suggested questions if necessary
-preguntas_sugeridas = [translate_text(q, selected_language_code) for q in preguntas_sugeridas]
-
 # Show suggested questions as buttons
-st.write(f"**{t('Preguntas sugeridas')}**")
+st.write("**Preguntas sugeridas**")
 selected_question = None
 for pregunta in preguntas_sugeridas:
     if st.button(pregunta):
         st.session_state.query = pregunta  # Update session state query
 
 # Input for custom questions
-query_label = t("Pregunta algo sobre Devociones Marianas o Danzas de Paucartambo:")
 query_str = st.text_input(
-    query_label,
+    "Pregunta algo sobre Devociones Marianas o Danzas de Paucartambo:",
     value=st.session_state.query,
 )
 
 # "Responder" button to fetch response
-if st.button(t("Responder")):
+if st.button("Responder"):
     if query_str.strip():
         st.session_state.query = query_str
-        # If language is not Spanish, translate the query to Spanish
-        if selected_language_code != "es":
-            translated_query = translator.translate(query_str, src=selected_language_code, dest="es").text
-        else:
-            translated_query = query_str
         rag = vectara.as_chat(config)
-        response = rag.invoke(translated_query)
-        response_text = response.get("answer", "Lo siento, no tengo suficiente información para responder a tu pregunta.")
-        # Translate the response back to the selected language if necessary
-        if selected_language_code != "es":
-            response_text = translator.translate(response_text, src="es", dest=selected_language_code).text
-        st.session_state.response = response_text
+        response = rag.invoke(query_str)
+        st.session_state.response = response.get("answer", "Lo siento, no tengo suficiente información para responder a tu pregunta.")
     else:
-        st.warning(t("Por favor, ingresa una pregunta válida."))
+        st.warning("Por favor, ingresa una pregunta válida.")
 
 # Editable response area
-st.write(f"**{t('Respuesta (editable):')}**")
+st.write("**Respuesta (editable):**")
 if st.session_state.response:
     st.session_state.response = st.text_area(
-        t("Edita la respuesta antes de guardar:"),
+        "Edita la respuesta antes de guardar:",
         value=st.session_state.response,
         height=150,
     )
 
 # Feature: Downloadable PDFs
-if st.button(t("Descargar respuesta en PDF")):
-    if st.session_state.response:
-        html_content = f"<h1>{t('Devociones de Paucartambo')}</h1><p>{st.session_state.response}</p>"
-        pdfkit.from_string(html_content, "tradiciones.pdf")
-        with open("tradiciones.pdf", "rb") as file:
-            st.download_button(t("Descargar PDF"), file, "tradiciones.pdf")
-    else:
-        st.warning(t("No hay respuesta para descargar. Por favor, realiza una consulta primero."))
+if st.button("Descargar respuesta en PDF"):
+    html_content = f"<h1>Respuesta generada</h1><p>{st.session_state.response}</p>"
+    pdfkit.from_string(html_content, "respuesta.pdf")
+    with open("respuesta.pdf", "rb") as file:
+        st.download_button("Descargar PDF", file, "respuesta.pdf")
 
 # Thumbs-up and Thumbs-down buttons for feedback
-st.write(f"**{t('¿Esta respuesta fue satisfactoria?')}**")
+st.write("**¿Esta respuesta fue satisfactoria?**")
 col1, col2 = st.columns(2)
 
 with col1:
-    if st.button("👍 " + t("Sí")):
-        save_to_vectara(st.session_state.query, st.session_state.response, t("Satisfactoria"))
-        # Gamification: Add points
-        st.session_state.points += 1
+    if st.button("👍 Sí"):
+        save_to_vectara(st.session_state.query, st.session_state.response, "Satisfactoria")
 
 with col2:
-    if st.button("👎 " + t("No")):
-        save_to_vectara(st.session_state.query, st.session_state.response, t("No satisfactoria"))
-
-# Feature: Gamification
-st.write(f"{t('Tus puntos acumulados')}: {st.session_state.points}")
-if st.session_state.points >= 5:
-    st.balloons()
-
+    if st.button("👎 No"):
+        save_to_vectara(st.session_state.query, st.session_state.response, "No satisfactoria")

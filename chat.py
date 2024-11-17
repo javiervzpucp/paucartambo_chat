@@ -20,22 +20,9 @@ def translate_text(text, target_language):
     translator = Translator(to_lang=target_language)
     return translator.translate(text)
 
-# Initialize session state for language
-if "language" not in st.session_state:
-    st.session_state.language = "Español"  # Default language is Spanish
-
 # Language selection at the beginning
 st.markdown("### Seleccione un idioma / Choose a language / Rimanapayay hina simi suyay")
-language = st.selectbox(
-    "Idioma / Language / Simi",
-    ["Español", "English", "Quechua"],
-    index=["Español", "English", "Quechua"].index(st.session_state.language),
-)
-
-# Update session state language
-if language != st.session_state.language:
-    st.session_state.language = language
-    st.experimental_rerun()  # Rerun the app to apply the language change
+language = st.selectbox("Idioma / Language / Simi", ["Español", "English", "Quechua"], index=0)
 
 # Map the language choice to a language code for the Translator library
 language_map = {
@@ -43,7 +30,11 @@ language_map = {
     "English": "en",
     "Quechua": "qu",
 }
-selected_language_code = language_map[st.session_state.language]
+selected_language_code = language_map[language]
+
+# Translation function for dynamic text
+def dynamic_translation(text):
+    return translate_text(text, selected_language_code)
 
 # Vectara Configuration
 vectara = Vectara(
@@ -65,12 +56,12 @@ if "response" not in st.session_state:
     st.session_state.response = ""
 
 # Title
-st.markdown(translate_text("### Prototipo de chat sobre las Devociones Marianas de Paucartambo", selected_language_code))
+st.markdown(dynamic_translation("### Prototipo de chat sobre las Devociones Marianas de Paucartambo"))
 
 # Display an image below the title
 st.image(
     "https://raw.githubusercontent.com/javiervzpucp/paucartambo/main/imagenes/1.png",
-    caption=translate_text("Virgen del Carmen de Paucartambo", selected_language_code),
+    caption=dynamic_translation("Virgen del Carmen de Paucartambo"),
     use_container_width=True,
 )
 
@@ -84,10 +75,10 @@ preguntas_sugeridas = [
 ]
 
 # Translate suggested questions to the selected language
-preguntas_sugeridas_translated = [translate_text(p, selected_language_code) for p in preguntas_sugeridas]
+preguntas_sugeridas_translated = [dynamic_translation(p) for p in preguntas_sugeridas]
 
 # Show suggested questions as buttons
-st.write(translate_text("**Preguntas sugeridas**", selected_language_code))
+st.write(dynamic_translation("**Preguntas sugeridas**"))
 selected_question = None
 for pregunta in preguntas_sugeridas_translated:
     if st.button(pregunta):
@@ -95,29 +86,28 @@ for pregunta in preguntas_sugeridas_translated:
 
 # Input for custom questions
 query_str = st.text_input(
-    translate_text("Pregunta algo sobre Devociones Marianas o Danzas de Paucartambo:", selected_language_code),
+    dynamic_translation("Pregunta algo sobre Devociones Marianas o Danzas de Paucartambo:"),
     value=st.session_state.query,
 )
 
 # "Responder" button to fetch response
-if st.button(translate_text("Responder", selected_language_code)):
+if st.button(dynamic_translation("Responder")):
     if query_str.strip():
         st.session_state.query = query_str
         rag = vectara.as_chat(config)
         response = rag.invoke(query_str)
-        translated_response = translate_text(
-            response.get("answer", "Lo siento, no tengo suficiente información para responder a tu pregunta."),
-            selected_language_code,
+        translated_response = dynamic_translation(
+            response.get("answer", "Lo siento, no tengo suficiente información para responder a tu pregunta.")
         )
         st.session_state.response = translated_response
     else:
-        st.warning(translate_text("Por favor, ingresa una pregunta válida.", selected_language_code))
+        st.warning(dynamic_translation("Por favor, ingresa una pregunta válida."))
 
 # Editable response area
-st.write(translate_text("**Respuesta (editable):**", selected_language_code))
+st.write(dynamic_translation("**Respuesta (editable):**"))
 if st.session_state.response:
     st.session_state.response = st.text_area(
-        translate_text("Edita la respuesta antes de guardar:", selected_language_code),
+        dynamic_translation("Edita la respuesta antes de guardar:"),
         value=st.session_state.response,
         height=150,
     )
@@ -134,18 +124,18 @@ def save_to_vectara(query, response, satisfaction, document_id="2560b95df098dda3
             ],
             document_id=document_id,  # Specify the same document ID for appending
         )
-        st.success(translate_text(f"¡Respuesta marcada como '{satisfaction}' y guardada en Vectara!", selected_language_code))
+        st.success(dynamic_translation(f"¡Respuesta marcada como '{satisfaction}' y guardada en Vectara!"))
     except Exception as e:
-        st.error(translate_text(f"Error al guardar la respuesta en Vectara: {e}", selected_language_code))
+        st.error(dynamic_translation(f"Error al guardar la respuesta en Vectara: {e}"))
 
 # Thumbs-up and Thumbs-down buttons for feedback
-st.write(translate_text("**¿Esta respuesta fue satisfactoria?**", selected_language_code))
+st.write(dynamic_translation("**¿Esta respuesta fue satisfactoria?**"))
 col1, col2 = st.columns(2)
 
 with col1:
-    if st.button("👍 " + translate_text("Sí", selected_language_code)):
+    if st.button("👍 " + dynamic_translation("Sí")):
         save_to_vectara(st.session_state.query, st.session_state.response, "Satisfactoria")
 
 with col2:
-    if st.button("👎 " + translate_text("No", selected_language_code)):
+    if st.button("👎 " + dynamic_translation("No")):
         save_to_vectara(st.session_state.query, st.session_state.response, "No satisfactoria")

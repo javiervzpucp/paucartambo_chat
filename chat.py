@@ -7,9 +7,9 @@ Created on Thu Nov 14 11:08:21 2024
 import streamlit as st
 from docx import Document
 from io import BytesIO
-from langchain_community.vectorstores import Vectara
-from datetime import datetime
 from urllib.parse import quote
+from datetime import datetime
+from langchain_community.vectorstores import Vectara
 from dotenv import load_dotenv
 import os
 
@@ -22,15 +22,20 @@ vectara_customer_id = 2620549959
 vectara_corpus_id = 2
 vectara_api_key = "zwt_nDJrR3X2jvq60t7xt0kmBzDOEWxIGt8ZJqloiQ"
 
-# Inicializar cliente de Vectara
+# Configuración de Vectara
 vectara = Vectara(
     vectara_customer_id=str(vectara_customer_id),
     vectara_corpus_id=vectara_corpus_id,
     vectara_api_key=vectara_api_key,
 )
 
-# Configuración de Streamlit
+# Configuración de la app
 st.title("Prototipo de Chat sobre Devociones Marianas de Paucartambo")
+st.image(
+    "https://raw.githubusercontent.com/javiervzpucp/paucartambo/main/imagenes/1.png",
+    caption="Virgen del Carmen de Paucartambo",
+    use_container_width=True,
+)
 
 # Preguntas sugeridas
 preguntas_sugeridas = [
@@ -65,8 +70,9 @@ response = ""
 if st.button("Responder"):
     if query.strip():
         response = fetch_vectara_response(query)
-        st.write("**Respuesta generada:**")
-        st.write(response)
+        st.write("**Última respuesta generada:**")
+        st.write(f"**Pregunta:** {query}")
+        st.write(f"**Respuesta:** {response}")
     else:
         st.warning("Por favor, ingresa una pregunta válida.")
 
@@ -101,26 +107,18 @@ if response:
     st.write("**Compartir esta respuesta en redes sociales:**")
 
     # Crear enlaces para compartir
-    base_url = "https://twitter.com/intent/tweet"
     text = quote(f"Pregunta: {query}\nRespuesta: {response[:200]}...")
-    twitter_url = f"{base_url}?text={text}"
-
-    # Enlace para Twitter
-    st.markdown(
-        f"[Compartir en Twitter](https://twitter.com/intent/tweet?text={text})",
-        unsafe_allow_html=True
-    )
-
-    # Enlace para LinkedIn
+    twitter_url = f"https://twitter.com/intent/tweet?text={text}"
     linkedin_url = f"https://www.linkedin.com/sharing/share-offsite/?url={quote(text)}"
-    st.markdown(
-        f"[Compartir en LinkedIn]({linkedin_url})",
-        unsafe_allow_html=True
-    )
-
-    # Enlace para Facebook
     facebook_url = f"https://www.facebook.com/sharer/sharer.php?u={quote(text)}"
+
+    # Enlaces a redes sociales
     st.markdown(
-        f"[Compartir en Facebook]({facebook_url})",
-        unsafe_allow_html=True
+        f"[Compartir en Twitter]({twitter_url})", unsafe_allow_html=True
+    )
+    st.markdown(
+        f"[Compartir en LinkedIn]({linkedin_url})", unsafe_allow_html=True
+    )
+    st.markdown(
+        f"[Compartir en Facebook]({facebook_url})", unsafe_allow_html=True
     )

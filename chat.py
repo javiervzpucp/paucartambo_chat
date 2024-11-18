@@ -98,8 +98,12 @@ if st.button("Responder"):
                 if source not in unique_sources:
                     unique_sources[source] = doc.page_content[:300] + "..."
 
-            st.write("**Respuesta generada:**")
-            st.write(answer)
+            st.write("**Respuesta generada (editable):**")
+            if "editable_response" not in st.session_state:
+                st.session_state.editable_response = answer
+
+            edited_response = st.text_area("Edita la respuesta aquí:", value=st.session_state.editable_response)
+            st.session_state.editable_response = edited_response
 
             st.write("**Documentos relacionados:**")
             for i, (source, content) in enumerate(unique_sources.items()):
@@ -108,7 +112,7 @@ if st.button("Responder"):
 
             # Guardar la respuesta y la pregunta en la sesión
             st.session_state["last_query"] = query
-            st.session_state["response"] = answer
+            st.session_state["response"] = edited_response
         except Exception as e:
             st.error(f"Error: {e}")
     else:

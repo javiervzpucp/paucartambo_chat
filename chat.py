@@ -98,12 +98,12 @@ if st.button("Responder"):
                 if source not in unique_sources:
                     unique_sources[source] = doc.page_content[:300] + "..."
 
-            st.write("**Respuesta generada (editable):**")
-            if "editable_response" not in st.session_state:
-                st.session_state.editable_response = answer
-
-            edited_response = st.text_area("Edita la respuesta aquí:", value=st.session_state.editable_response)
-            st.session_state.editable_response = edited_response
+            st.write("**Respuesta generada:**")
+            st.session_state["response_editable"] = st.text_area(
+                "Editar la respuesta generada:",
+                value=answer,
+                height=200
+            )
 
             st.write("**Documentos relacionados:**")
             for i, (source, content) in enumerate(unique_sources.items()):
@@ -112,19 +112,18 @@ if st.button("Responder"):
 
             # Guardar la respuesta y la pregunta en la sesión
             st.session_state["last_query"] = query
-            st.session_state["response"] = edited_response
         except Exception as e:
             st.error(f"Error: {e}")
     else:
         st.warning("Por favor, ingresa una pregunta válida.")
 
 # Mostrar la última pregunta y respuesta generada si existen
-if "response" in st.session_state and "last_query" in st.session_state:
+if "response_editable" in st.session_state and "last_query" in st.session_state:
     st.write("**Última pregunta y respuesta generada:**")
     st.write(f"**Pregunta:** {st.session_state['last_query']}")
-    st.write(f"**Respuesta:** {st.session_state['response']}")
+    st.write(f"**Respuesta editable:** {st.session_state['response_editable']}")
 
-    # Exportar respuesta a un archivo Word
+    # Exportar respuesta editable a un archivo Word
     def export_to_word(question, response):
         doc = Document()
         doc.add_heading("Respuesta Generada", level=1)
@@ -136,7 +135,7 @@ if "response" in st.session_state and "last_query" in st.session_state:
 
     if st.button("Exportar respuesta a Word"):
         file_path = export_to_word(
-            st.session_state["last_query"], st.session_state["response"]
+            st.session_state["last_query"], st.session_state["response_editable"]
         )
         with open(file_path, "rb") as file:
             st.download_button(
@@ -167,7 +166,7 @@ def save_to_vectara(query, response):
 with col1:
     if st.button("👍 Sí"):
         try:
-            save_to_vectara(st.session_state["last_query"], st.session_state["response"])
+            save_to_vectara(st.session_state["last_query"], st.session_state["response_editable"])
         except Exception as e:
             st.error(f"Error: {e}")
 

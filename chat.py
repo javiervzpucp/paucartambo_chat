@@ -9,9 +9,7 @@ from langchain_community.vectorstores import Vectara
 from langchain.chains import RetrievalQA
 from langchain.chat_models import ChatOpenAI
 from dotenv import load_dotenv
-from datetime import datetime
 from docx import Document  # Para crear documentos de Word
-import os
 
 # Cargar las variables de entorno desde el archivo .env
 load_dotenv()
